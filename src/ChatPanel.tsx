@@ -72,6 +72,7 @@ export function ChatPanel({ expanded, onExpand, onMinimize, onClose }: ChatPanel
       >
         <Textarea
           variant="unstyled"
+          autoFocus
           placeholder="Type message..."
           autosize
           minRows={1}

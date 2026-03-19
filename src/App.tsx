@@ -1,9 +1,10 @@
-import { ActionIcon, Affix, AppShell, Box, Burger, Dialog, MantineProvider, Text } from "@mantine/core";
+import { ActionIcon, Affix, AppShell, Box, Burger, Dialog, MantineProvider, Text, Transition } from "@mantine/core";
 import "@mantine/core/styles.css";
 import { useDisclosure } from "@mantine/hooks";
 import { useState } from "react";
 import { ChatPanel } from "./ChatPanel";
 import { IconMessageCircle } from "@tabler/icons-react";
+
 function App() {
   const [opened, { toggle }] = useDisclosure();
   const [chatOpened, { open: openChat, close: closeChat }] = useDisclosure();
@@ -34,18 +35,20 @@ function App() {
 
         <AppShell.Navbar>Navbar</AppShell.Navbar>
 
-        <AppShell.Main>
+        <AppShell.Main style={{ overflow: 'hidden' }}>
           <Text onMouseUp={handleMouseUp} style={{ display: expanded ? "none" : undefined }}>
             Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni
             ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt
             laborum. Nihil?
           </Text>
 
-          {expanded && chatOpened && (
-            <Box style={{ height: "calc(100vh - 100px)", padding: "var(--mantine-spacing-md)" }}>
-              <ChatPanel expanded onMinimize={() => setExpanded(false)} onClose={handleClose} />
-            </Box>
-          )}
+          <Transition mounted={expanded && chatOpened} transition="pop-bottom-right" duration={300} timingFunction="ease">
+            {(styles) => (
+              <Box style={{ height: "calc(100vh - 100px)", ...styles }}>
+                <ChatPanel expanded onMinimize={() => setExpanded(false)} onClose={handleClose} />
+              </Box>
+            )}
+          </Transition>
 
           {!chatOpened && (
             <Affix position={{ bottom: 20, right: 20 }}>
