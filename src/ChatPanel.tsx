@@ -1,4 +1,4 @@
-import { ActionIcon, Box, Button, CloseButton, Flex, Group, ScrollArea, Stack, Text, Textarea } from "@mantine/core";
+import { ActionIcon, CloseButton, Flex, Group, ScrollArea, Stack, Text, Textarea } from "@mantine/core";
 import { IconMaximize, IconMinimize, IconLayoutSidebarRight, IconSend } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 
