@@ -1,6 +1,6 @@
 import { ActionIcon, Box, Button, CloseButton, Flex, Group, ScrollArea, Stack, Text, Textarea } from "@mantine/core";
-import { IconMaximize, IconMinimize, IconLayoutSidebarRight } from "@tabler/icons-react";
-import { useEffect, useRef } from "react";
+import { IconMaximize, IconMinimize, IconLayoutSidebarRight, IconSend } from "@tabler/icons-react";
+import { useEffect, useRef, useState } from "react";
 
 export type Message = { role: "user" | "agent"; text: string };
 
@@ -33,6 +33,14 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const viewport = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [viewportHeight, setViewportHeight] = useState(0);
+
+  useEffect(() => {
+    if (viewport.current) setViewportHeight(viewport.current.clientHeight);
+    setTimeout(() => {
+      lastTurnRef.current?.scrollIntoView({ block: "start" });
+    }, 0);
+  }, []);
 
   useEffect(() => {
     if (cursorPos !== null && textareaRef.current) {
@@ -40,6 +48,8 @@ export function ChatPanel({
       textareaRef.current.setSelectionRange(cursorPos, cursorPos);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const lastTurnRef = useRef<HTMLDivElement>(null);
 
   const sendMessage = () => {
     if (!input.trim()) return;
@@ -56,39 +66,66 @@ export function ChatPanel({
       },
     ]);
     setInput("");
-    setTimeout(() => viewport.current?.scrollTo({ top: viewport.current.scrollHeight, behavior: "smooth" }), 0);
+    setTimeout(() => {
+      lastTurnRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    }, 0);
   };
 
+  const turns = messages.reduce<Message[][]>((acc, m) => {
+    if (m.role === "user") acc.push([m]);
+    else if (acc.length > 0) acc[acc.length - 1].push(m);
+    return acc;
+  }, []);
+
   return (
-    <Box style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <Group mb="xs">
+    <Stack gap="xs" style={{ height: "100%" }}>
+      <Group>
         <Text fw={500} mr="auto">
           Chat with AI
         </Text>
         {expanded ? (
           <ActionIcon variant="subtle" color="gray" onClick={onMinimize}>
-            <IconMinimize />
+            <IconMinimize size={20} />
           </ActionIcon>
         ) : (
           <ActionIcon variant="subtle" color="gray" onClick={onExpand}>
-            <IconMaximize />
+            <IconMaximize size={20} />
           </ActionIcon>
         )}
         {onMoveToAside && (
           <ActionIcon variant="subtle" color="gray" onClick={onMoveToAside}>
-            <IconLayoutSidebarRight />
+            <IconLayoutSidebarRight size={20} />
           </ActionIcon>
         )}
         {onClose && <CloseButton onClick={onClose} />}
       </Group>
 
-      <ScrollArea style={{ flex: 1 }} viewportRef={viewport}>
-        <Stack>
-          {messages.map((m, i) => (
-            <Text key={i} size="sm" fw={500} ta={m.role === "user" ? "right" : "left"}>
-              {m.text}
-            </Text>
-          ))}
+      <ScrollArea type="scroll" style={{ flex: 1 }} viewportRef={viewport}>
+        <Stack gap={0}>
+          {turns.map((turn, i) => {
+            const isLast = i === turns.length - 1;
+            return (
+              <Stack
+                key={i}
+                ref={isLast ? lastTurnRef : undefined}
+                gap="xs"
+                style={{
+                  minHeight: isLast ? viewportHeight || "100%" : undefined, // ← only last turn
+                  justifyContent: "flex-start",
+                  paddingTop: "var(--mantine-spacing-xs)",
+                }}
+              >
+                {turn.map((m, j) => (
+                  <Text
+                    key={j}
+                    size="sm" fw={500} ta={m.role === "user" ? "right" : "left"}
+                  >
+                    {m.text}
+                  </Text>
+                ))}
+              </Stack>
+            );
+          })}
         </Stack>
       </ScrollArea>
 
@@ -133,11 +170,11 @@ export function ChatPanel({
           }}
         />
         <Flex justify="flex-end">
-          <Button size="sm" onClick={sendMessage}>
-            Send
-          </Button>
+          <ActionIcon color="blue" onClick={sendMessage}>
+            <IconSend size={18} />
+          </ActionIcon>
         </Flex>
       </Stack>
-    </Box>
+    </Stack>
   );
 }

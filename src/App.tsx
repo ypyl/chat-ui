@@ -8,7 +8,6 @@ import {
   Mark,
   MantineProvider,
   Text,
-  Transition,
 } from "@mantine/core";
 import "@mantine/core/styles.css";
 import { useDisclosure } from "@mantine/hooks";
