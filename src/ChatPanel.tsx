@@ -1,20 +1,45 @@
 import { ActionIcon, Box, Button, CloseButton, Flex, Group, ScrollArea, Stack, Text, Textarea } from "@mantine/core";
-import { IconMaximize, IconMinimize } from "@tabler/icons-react";
-import { useRef, useState } from "react";
+import { IconMaximize, IconMinimize, IconLayoutSidebarRight } from "@tabler/icons-react";
+import { useEffect, useRef } from "react";
 
-type Message = { role: "user" | "agent"; text: string };
+export type Message = { role: "user" | "agent"; text: string };
 
 interface ChatPanelProps {
   expanded?: boolean;
   onExpand?: () => void;
   onMinimize?: () => void;
   onClose?: () => void;
+  onMoveToAside?: () => void;
+  messages: Message[];
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  input: string;
+  setInput: React.Dispatch<React.SetStateAction<string>>;
+  cursorPos: number | null;
+  setCursorPos: React.Dispatch<React.SetStateAction<number | null>>;
 }
 
-export function ChatPanel({ expanded, onExpand, onMinimize, onClose }: ChatPanelProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
+export function ChatPanel({
+  expanded,
+  onExpand,
+  onMinimize,
+  onClose,
+  onMoveToAside,
+  messages,
+  setMessages,
+  input,
+  setInput,
+  cursorPos,
+  setCursorPos,
+}: ChatPanelProps) {
   const viewport = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (cursorPos !== null && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(cursorPos, cursorPos);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sendMessage = () => {
     if (!input.trim()) return;
@@ -49,6 +74,11 @@ export function ChatPanel({ expanded, onExpand, onMinimize, onClose }: ChatPanel
             <IconMaximize />
           </ActionIcon>
         )}
+        {onMoveToAside && (
+          <ActionIcon variant="subtle" color="gray" onClick={onMoveToAside}>
+            <IconLayoutSidebarRight />
+          </ActionIcon>
+        )}
         {onClose && <CloseButton onClick={onClose} />}
       </Group>
 
@@ -71,6 +101,7 @@ export function ChatPanel({ expanded, onExpand, onMinimize, onClose }: ChatPanel
         }}
       >
         <Textarea
+          ref={textareaRef}
           variant="unstyled"
           autoFocus
           placeholder="Type message..."
@@ -93,6 +124,7 @@ export function ChatPanel({ expanded, onExpand, onMinimize, onClose }: ChatPanel
             },
           }}
           onChange={(e) => setInput(e.currentTarget.value)}
+          onSelect={(e) => setCursorPos(e.currentTarget.selectionStart)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
