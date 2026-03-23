@@ -122,7 +122,7 @@ function App() {
             radius="md"
             p="xs"
           >
-            <Box style={{ height: "500px" }}>
+            <Box style={{ height: "calc(50vh - 20px)" }}>
               <ChatPanel
                 onExpand={() => setExpanded(true)}
                 onMoveToAside={() => setAsideChat(true)}
