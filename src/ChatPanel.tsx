@@ -1,4 +1,4 @@
-import { ActionIcon, CloseButton, Flex, Group, ScrollArea, Stack, Text, Textarea } from "@mantine/core";
+import { ActionIcon, CloseButton, Flex, Group, Paper, ScrollArea, Stack, Text, Textarea } from "@mantine/core";
 import { IconMaximize, IconMinimize, IconLayoutSidebarRight, IconSend } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -116,10 +116,7 @@ export function ChatPanel({
                 }}
               >
                 {turn.map((m, j) => (
-                  <Text
-                    key={j}
-                    size="sm" fw={500} ta={m.role === "user" ? "right" : "left"}
-                  >
+                  <Text key={j} size="sm" fw={500} ta={m.role === "user" ? "right" : "left"}>
                     {m.text}
                   </Text>
                 ))}
@@ -129,52 +126,47 @@ export function ChatPanel({
         </Stack>
       </ScrollArea>
 
-      <Stack
-        gap="xs"
-        style={{
-          border: "1px solid var(--mantine-color-gray-3)",
-          borderRadius: "var(--mantine-radius-md)",
-          padding: "var(--mantine-spacing-xs)",
-        }}
-      >
-        <Textarea
-          ref={textareaRef}
-          variant="unstyled"
-          autoFocus
-          placeholder="Type message..."
-          autosize
-          minRows={1}
-          maxRows={4}
-          value={input}
-          styles={{
-            wrapper: {
-              // Prevents the wrapper from being a target for text selection/cursor placement
-              userSelect: "none",
-              cursor: "text",
-            },
-            input: {
-              // Re-enables selection specifically for the text area
-              userSelect: "text",
-              // Ensures the textarea fills the wrapper's clickable area
-              height: "100%",
-              width: "100%",
-            },
-          }}
-          onChange={(e) => setInput(e.currentTarget.value)}
-          onSelect={(e) => setCursorPos(e.currentTarget.selectionStart)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              sendMessage();
-            }
-          }}
-        />
-        <Flex justify="flex-end">
-          <ActionIcon color="blue" onClick={sendMessage}>
-            <IconSend size={18} />
-          </ActionIcon>
-        </Flex>
-      </Stack>
+      <Paper shadow="xs" radius="md">
+        <Stack gap="xs" m="xs">
+          <Textarea
+            ref={textareaRef}
+            variant="unstyled"
+            autoFocus
+            placeholder="Type message..."
+            autosize
+            minRows={1}
+            maxRows={4}
+            value={input}
+            styles={{
+              wrapper: {
+                // Prevents the wrapper from being a target for text selection/cursor placement
+                userSelect: "none",
+                cursor: "text",
+              },
+              input: {
+                // Re-enables selection specifically for the text area
+                userSelect: "text",
+                // Ensures the textarea fills the wrapper's clickable area
+                height: "100%",
+                width: "100%",
+              },
+            }}
+            onChange={(e) => setInput(e.currentTarget.value)}
+            onSelect={(e) => setCursorPos(e.currentTarget.selectionStart)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+              }
+            }}
+          />
+          <Flex justify="flex-end">
+            <ActionIcon color="blue" onClick={sendMessage}>
+              <IconSend size={18} />
+            </ActionIcon>
+          </Flex>
+        </Stack>
+      </Paper>
     </Stack>
   );
 }
