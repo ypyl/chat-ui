@@ -45,6 +45,7 @@ function App() {
     const selected = range.toString();
     setHighlight({ start, end: start + selected.length });
     selection.removeAllRanges();
+    setMessages((prev) => [...prev, { role: "agent", text: `I can help explain: "${selected}"` }]);
     openChat();
   };
 

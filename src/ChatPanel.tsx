@@ -1,8 +1,23 @@
 import { ActionIcon, CloseButton, Flex, Group, Paper, ScrollArea, Stack, Text, Textarea } from "@mantine/core";
-import { IconMaximize, IconMinimize, IconLayoutSidebarRight, IconSend } from "@tabler/icons-react";
+import {
+  IconMaximize,
+  IconMinimize,
+  IconLayoutSidebarRight,
+  IconSend,
+  IconTrash,
+  IconCopy,
+  IconRefresh,
+  IconEdit,
+  IconCheck,
+  IconX,
+} from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 
 export type Message = { role: "user" | "agent"; text: string };
+
+const fakeAgentReply = () =>
+  "Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil? Voluptatem accusantium doloremque laudantium totam rem aperiam eaque ipsa quae ab illo inventore veritatis."
+    .split(" ").slice(0, Math.floor(Math.random() * 30) + 5).join(" ") + ".";
 
 interface ChatPanelProps {
   expanded?: boolean;
@@ -34,6 +49,7 @@ export function ChatPanel({
   const viewport = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
+  const lastTurnRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (viewport.current) setViewportHeight(viewport.current.clientHeight);
@@ -49,7 +65,20 @@ export function ChatPanel({
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const lastTurnRef = useRef<HTMLDivElement>(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
+
+  const saveEdit = (index: number) => {
+    if (!editText.trim()) return;
+    setMessages((prev) => {
+      const updated = [...prev];
+      updated[index] = { role: "user", text: editText };
+      // regenerate the immediately following agent message if present
+      if (updated[index + 1]?.role === "agent") updated[index + 1] = { role: "agent", text: fakeAgentReply() };
+      return updated;
+    });
+    setEditingIndex(null);
+  };
 
   const sendMessage = () => {
     if (!input.trim()) return;
@@ -58,11 +87,7 @@ export function ChatPanel({
       { role: "user", text: input },
       {
         role: "agent",
-        text:
-          "Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil? Voluptatem accusantium doloremque laudantium totam rem aperiam eaque ipsa quae ab illo inventore veritatis."
-            .split(" ")
-            .slice(0, Math.floor(Math.random() * 30) + 5)
-            .join(" ") + ".",
+        text: fakeAgentReply(),
       },
     ]);
     setInput("");
@@ -71,9 +96,12 @@ export function ChatPanel({
     }, 0);
   };
 
-  const turns = messages.reduce<Message[][]>((acc, m) => {
-    if (m.role === "user") acc.push([m]);
-    else if (acc.length > 0) acc[acc.length - 1].push(m);
+  type IndexedMessage = Message & { _index: number };
+  const turns = messages.reduce<IndexedMessage[][]>((acc, m, i) => {
+    const entry: IndexedMessage = { ...m, _index: i };
+    if (m.role === "user") acc.push([entry]);
+    else if (acc.length > 0) acc[acc.length - 1].push(entry);
+    else acc.push([entry]);
     return acc;
   }, []);
 
@@ -116,9 +144,95 @@ export function ChatPanel({
                 }}
               >
                 {turn.map((m, j) => (
-                  <Text key={j} size="sm" fw={500} ta={m.role === "user" ? "right" : "left"}>
-                    {m.text}
-                  </Text>
+                  <Stack key={j} gap={2} align={m.role === "user" ? "flex-end" : "flex-start"} className="chat-message">
+                    <Stack gap="xs">
+                      {editingIndex === m._index ? (
+                        <Textarea
+                          autoFocus
+                          autosize
+                          minRows={1}
+                          maxRows={4}
+                          size="sm"
+                          value={editText}
+                          onChange={(e) => setEditText(e.currentTarget.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              saveEdit(m._index);
+                            }
+                            if (e.key === "Escape") setEditingIndex(null);
+                          }}
+                        />
+                      ) : (
+                        <Text size="sm" fw={500}>
+                          {m.text}
+                        </Text>
+                      )}
+                      <Group
+                        gap="xs"
+                        className="chat-delete-btn"
+                        justify={m.role === "user" ? editingIndex === m._index ? "space-between" : "flex-end" : undefined}
+                      >
+                        {m.role === "agent" && (
+                          <ActionIcon
+                            size="xs"
+                            variant="subtle"
+                            color="gray"
+                            onClick={() => navigator.clipboard.writeText(m.text)}
+                          >
+                            <IconCopy size={12} />
+                          </ActionIcon>
+                        )}
+                        {m.role === "agent" && (
+                          <ActionIcon
+                            size="xs"
+                            variant="subtle"
+                            color="gray"
+                            onClick={() =>
+                              setMessages((prev) => {
+                                const updated = [...prev];
+                                updated[m._index] = { role: "agent", text: fakeAgentReply() };
+                                return updated;
+                              })
+                            }
+                          >
+                            <IconRefresh size={12} />
+                          </ActionIcon>
+                        )}
+                        {m.role === "user" && editingIndex !== m._index && (
+                          <ActionIcon
+                            size="xs"
+                            variant="subtle"
+                            color="gray"
+                            onClick={() => {
+                              setEditingIndex(m._index);
+                              setEditText(m.text);
+                            }}
+                          >
+                            <IconEdit size={12} />
+                          </ActionIcon>
+                        )}
+                        {m.role === "user" && editingIndex === m._index && (
+                          <Group gap="xs">
+                            <ActionIcon size="xs" variant="subtle" color="green" onClick={() => saveEdit(m._index)}>
+                              <IconCheck size={12} />
+                            </ActionIcon>
+                            <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setEditingIndex(null)}>
+                              <IconX size={12} />
+                            </ActionIcon>
+                          </Group>
+                        )}
+                        <ActionIcon
+                          size="xs"
+                          variant="subtle"
+                          color="red"
+                          onClick={() => setMessages((prev) => prev.filter((_, i) => i !== m._index))}
+                        >
+                          <IconTrash size={12} />
+                        </ActionIcon>
+                      </Group>
+                    </Stack>
+                  </Stack>
                 ))}
               </Stack>
             );
