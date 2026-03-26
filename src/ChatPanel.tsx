@@ -1,4 +1,4 @@
-import { ActionIcon, CloseButton, Flex, Group, Paper, ScrollArea, Stack, Text, Textarea } from "@mantine/core";
+import { ActionIcon, Button, CloseButton, CopyButton, Flex, Group, Paper, ScrollArea, Stack, Text, Textarea, Tooltip } from "@mantine/core";
 import {
   IconMaximize,
   IconMinimize,
@@ -13,7 +13,7 @@ import {
 } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 
-export type Message = { role: "user" | "agent"; text: string };
+export type Message = { role: "user" | "agent"; text: string; deleted?: boolean };
 
 const fakeAgentReply = () =>
   "Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil? Voluptatem accusantium doloremque laudantium totam rem aperiam eaque ipsa quae ab illo inventore veritatis."
@@ -105,6 +105,20 @@ export function ChatPanel({
     return acc;
   }, []);
 
+  const deleteTurn = (turn: IndexedMessage[]) =>
+    setMessages((prev) => {
+      const updated = [...prev];
+      turn.forEach((m) => { updated[m._index] = { ...updated[m._index], deleted: true }; });
+      return updated;
+    });
+
+  const undoTurn = (turn: IndexedMessage[]) =>
+    setMessages((prev) => {
+      const updated = [...prev];
+      turn.forEach((m) => { updated[m._index] = { ...updated[m._index], deleted: false }; });
+      return updated;
+    });
+
   return (
     <Stack gap="xs" style={{ height: "100%" }}>
       <Group>
@@ -143,97 +157,102 @@ export function ChatPanel({
                   paddingTop: "var(--mantine-spacing-xs)",
                 }}
               >
-                {turn.map((m, j) => (
-                  <Stack key={j} gap={2} align={m.role === "user" ? "flex-end" : "flex-start"} className="chat-message">
-                    <Stack gap="xs">
-                      {editingIndex === m._index ? (
-                        <Textarea
-                          autoFocus
-                          autosize
-                          minRows={1}
-                          maxRows={4}
-                          size="sm"
-                          value={editText}
-                          onChange={(e) => setEditText(e.currentTarget.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                              e.preventDefault();
-                              saveEdit(m._index);
-                            }
-                            if (e.key === "Escape") setEditingIndex(null);
-                          }}
-                        />
-                      ) : (
-                        <Text size="sm" fw={500}>
-                          {m.text}
-                        </Text>
-                      )}
-                      <Group
-                        gap="xs"
-                        className="chat-delete-btn"
-                        justify={m.role === "user" ? editingIndex === m._index ? "space-between" : "flex-end" : undefined}
-                      >
-                        {m.role === "agent" && (
-                          <ActionIcon
-                            size="xs"
-                            variant="subtle"
-                            color="gray"
-                            onClick={() => navigator.clipboard.writeText(m.text)}
-                          >
-                            <IconCopy size={12} />
-                          </ActionIcon>
-                        )}
-                        {m.role === "agent" && (
-                          <ActionIcon
-                            size="xs"
-                            variant="subtle"
-                            color="gray"
-                            onClick={() =>
-                              setMessages((prev) => {
-                                const updated = [...prev];
-                                updated[m._index] = { role: "agent", text: fakeAgentReply() };
-                                return updated;
-                              })
-                            }
-                          >
-                            <IconRefresh size={12} />
-                          </ActionIcon>
-                        )}
-                        {m.role === "user" && editingIndex !== m._index && (
-                          <ActionIcon
-                            size="xs"
-                            variant="subtle"
-                            color="gray"
-                            onClick={() => {
-                              setEditingIndex(m._index);
-                              setEditText(m.text);
+                {turn[0]?.deleted ? (
+                  <Button variant="transparent" size="xs" p={4} onClick={() => undoTurn(turn)}>Restore deleted messages</Button>
+                ) : (
+                  turn.map((m, j) => (
+                    <Stack key={j} gap={2} align={m.role === "user" ? "flex-end" : "flex-start"} className="chat-message">
+                      <Stack gap="xs">
+                        {editingIndex === m._index ? (
+                          <Textarea
+                            autoFocus
+                            autosize
+                            minRows={1}
+                            maxRows={4}
+                            size="sm"
+                            value={editText}
+                            onChange={(e) => setEditText(e.currentTarget.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                saveEdit(m._index);
+                              }
+                              if (e.key === "Escape") setEditingIndex(null);
                             }}
-                          >
-                            <IconEdit size={12} />
-                          </ActionIcon>
+                          />
+                        ) : (
+                          <Text size="sm" fw={500}>
+                            {m.text}
+                          </Text>
                         )}
-                        {m.role === "user" && editingIndex === m._index && (
-                          <Group gap="xs">
-                            <ActionIcon size="xs" variant="subtle" color="green" onClick={() => saveEdit(m._index)}>
-                              <IconCheck size={12} />
-                            </ActionIcon>
-                            <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setEditingIndex(null)}>
-                              <IconX size={12} />
-                            </ActionIcon>
-                          </Group>
-                        )}
-                        <ActionIcon
-                          size="xs"
-                          variant="subtle"
-                          color="red"
-                          onClick={() => setMessages((prev) => prev.filter((_, i) => i !== m._index))}
+                        <Group
+                          gap="xs"
+                          className="chat-delete-btn"
+                          justify={m.role === "user" ? editingIndex === m._index ? "space-between" : "flex-end" : undefined}
                         >
-                          <IconTrash size={12} />
-                        </ActionIcon>
-                      </Group>
+                          {m.role === "agent" && (
+                            <CopyButton value={m.text} timeout={2000}>
+                              {({ copied, copy }) => (
+                                <Tooltip label={copied ? "Copied" : "Copy"} withArrow position="right">
+                                  <ActionIcon size="xs" color={copied ? "teal" : "gray"} variant="subtle" onClick={copy}>
+                                    {copied ? <IconCheck size={12} /> : <IconCopy size={12} />}
+                                  </ActionIcon>
+                                </Tooltip>
+                              )}
+                            </CopyButton>
+                          )}
+                          {m.role === "agent" && (
+                            <ActionIcon
+                              size="xs"
+                              variant="subtle"
+                              color="gray"
+                              onClick={() =>
+                                setMessages((prev) => {
+                                  const updated = [...prev];
+                                  updated[m._index] = { role: "agent", text: fakeAgentReply() };
+                                  return updated;
+                                })
+                              }
+                            >
+                              <IconRefresh size={12} />
+                            </ActionIcon>
+                          )}
+                          {m.role === "user" && editingIndex !== m._index && (
+                            <ActionIcon
+                              size="xs"
+                              variant="subtle"
+                              color="gray"
+                              onClick={() => {
+                                setEditingIndex(m._index);
+                                setEditText(m.text);
+                              }}
+                            >
+                              <IconEdit size={12} />
+                            </ActionIcon>
+                          )}
+                          {m.role === "user" && editingIndex === m._index && (
+                            <Group gap="xs">
+                              <ActionIcon size="xs" variant="subtle" color="green" onClick={() => saveEdit(m._index)}>
+                                <IconCheck size={12} />
+                              </ActionIcon>
+                              <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setEditingIndex(null)}>
+                                <IconX size={12} />
+                              </ActionIcon>
+                            </Group>
+                          )}
+                          <ActionIcon
+                            size="xs"
+                            variant="subtle"
+                            color="red"
+                            onClick={() => deleteTurn(turn)}
+                          >
+                            <IconTrash size={12} />
+                          </ActionIcon>
+                        </Group>
+                      </Stack>
                     </Stack>
-                  </Stack>
-                ))}
+                  ))
+                )}
               </Stack>
             );
           })}
