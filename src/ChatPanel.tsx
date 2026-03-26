@@ -128,7 +128,7 @@ export function ChatPanel({
         {onClose && <CloseButton onClick={onClose} />}
       </Group>
 
-      <ScrollArea type="scroll" style={{ flex: 1 }} viewportRef={viewport}>
+      <ScrollArea type="scroll" style={{ flex: 1, cursor: "default" }} viewportRef={viewport}>
         <Stack gap={0}>
           {turns.map((turn, i) => {
             const isLast = i === turns.length - 1;
@@ -240,8 +240,8 @@ export function ChatPanel({
         </Stack>
       </ScrollArea>
 
-      <Paper shadow="xs" radius="md">
-        <Stack gap="xs" m="xs">
+      <Paper shadow="xs" radius="md" p="xs">
+        <Stack gap="xs" style={{ userSelect: "none" }}>
           <Textarea
             ref={textareaRef}
             variant="unstyled"
@@ -251,20 +251,6 @@ export function ChatPanel({
             minRows={1}
             maxRows={4}
             value={input}
-            styles={{
-              wrapper: {
-                // Prevents the wrapper from being a target for text selection/cursor placement
-                userSelect: "none",
-                cursor: "text",
-              },
-              input: {
-                // Re-enables selection specifically for the text area
-                userSelect: "text",
-                // Ensures the textarea fills the wrapper's clickable area
-                height: "100%",
-                width: "100%",
-              },
-            }}
             onChange={(e) => setInput(e.currentTarget.value)}
             onSelect={(e) => setCursorPos(e.currentTarget.selectionStart)}
             onKeyDown={(e) => {
