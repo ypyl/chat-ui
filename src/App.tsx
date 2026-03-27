@@ -8,6 +8,7 @@ import {
   Mark,
   MantineProvider,
   Text,
+  Container,
 } from "@mantine/core";
 import "@mantine/core/styles.css";
 import { useDisclosure } from "@mantine/hooks";
@@ -31,7 +32,7 @@ function App() {
   const [input, setInput] = useState("");
   const [cursorPos, setCursorPos] = useState<number | null>(null);
   const fullText =
-    "Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?";
+    "Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?";
   const [highlight, setHighlight] = useState<{ start: number; end: number } | null>(null);
 
   const handleMouseUp = (e: React.MouseEvent<HTMLSpanElement>) => {
@@ -54,13 +55,14 @@ function App() {
       <AppShell
         padding="md"
         header={{ height: 60 }}
-        navbar={{
-          width: 300,
-          breakpoint: "sm",
-          collapsed: { mobile: !opened },
-        }}
+        withBorder={false}
+        // navbar={{
+        //   width: { sm: 200, lg: 300 },
+        //   breakpoint: "sm",
+        //   collapsed: { mobile: !opened },
+        // }}
         aside={{
-          width: 300,
+          width: { sm: 200, md: 300, lg: 400, xl: 500 },
           breakpoint: "sm",
           collapsed: { mobile: !opened, desktop: !asideChat },
         }}
@@ -70,73 +72,75 @@ function App() {
           <div>Logo</div>
         </AppShell.Header>
 
-        <AppShell.Navbar>Navbar</AppShell.Navbar>
+        {/* <AppShell.Navbar>Navbar</AppShell.Navbar> */}
 
         <AppShell.Main style={{ overflow: "hidden" }}>
-          <Text component="span" onMouseUp={handleMouseUp} style={{ display: expanded ? "none" : undefined }}>
-            {highlight ? (
-              <>
-                {fullText.slice(0, highlight.start)}
-                <Mark color="var(--mantine-color-blue-9)" style={{ color: "white" }}>
-                  {fullText.slice(highlight.start, highlight.end)}
-                </Mark>
-                {fullText.slice(highlight.end)}
-              </>
-            ) : (
-              fullText
+          <Container>
+            <Text component="span" onMouseUp={handleMouseUp} style={{ display: expanded ? "none" : undefined }}>
+              {highlight ? (
+                <>
+                  {fullText.slice(0, highlight.start)}
+                  <Mark color="var(--mantine-color-blue-9)" style={{ color: "white" }}>
+                    {fullText.slice(highlight.start, highlight.end)}
+                  </Mark>
+                  {fullText.slice(highlight.end)}
+                </>
+              ) : (
+                fullText
+              )}
+            </Text>
+
+            {expanded && chatOpened && (
+              <Box style={{ height: "calc(100vh - 100px)" }}>
+                <ChatPanel
+                  expanded
+                  onMinimize={() => setExpanded(false)}
+                  onMoveToAside={() => {
+                    setAsideChat(true);
+                    setExpanded(false);
+                  }}
+                  onClose={handleClose}
+                  messages={messages}
+                  setMessages={setMessages}
+                  input={input}
+                  setInput={setInput}
+                  cursorPos={cursorPos}
+                  setCursorPos={setCursorPos}
+                />
+              </Box>
             )}
-          </Text>
 
-          {expanded && chatOpened && (
-            <Box style={{ height: "calc(100vh - 100px)" }}>
-              <ChatPanel
-                expanded
-                onMinimize={() => setExpanded(false)}
-                onMoveToAside={() => {
-                  setAsideChat(true);
-                  setExpanded(false);
-                }}
-                onClose={handleClose}
-                messages={messages}
-                setMessages={setMessages}
-                input={input}
-                setInput={setInput}
-                cursorPos={cursorPos}
-                setCursorPos={setCursorPos}
-              />
-            </Box>
-          )}
+            {!chatOpened && (
+              <Affix position={{ bottom: 20, right: 20 }}>
+                <ActionIcon variant="filled" aria-label="Chat" size="xl" radius="xl" onClick={openChat}>
+                  <IconMessageCircle />
+                </ActionIcon>
+              </Affix>
+            )}
 
-          {!chatOpened && (
-            <Affix position={{ bottom: 20, right: 20 }}>
-              <ActionIcon variant="filled" aria-label="Chat" size="xl" radius="xl" onClick={openChat}>
-                <IconMessageCircle />
-              </ActionIcon>
-            </Affix>
-          )}
-
-          <Dialog
-            withBorder
-            opened={chatOpened && !expanded && !asideChat}
-            onClose={handleClose}
-            size="lg"
-            radius="md"
-            p="xs"
-          >
-            <Box style={{ height: "calc(50vh - 20px)" }}>
-              <ChatPanel
-                onExpand={() => setExpanded(true)}
-                onMoveToAside={() => setAsideChat(true)}
-                onClose={handleClose}
-                messages={messages}
-                setMessages={setMessages}
-                input={input}
-                setInput={setInput}
-                cursorPos={cursorPos}
-                setCursorPos={setCursorPos}
-              />
-            </Box>
-          </Dialog>
+            <Dialog
+              withBorder
+              opened={chatOpened && !expanded && !asideChat}
+              onClose={handleClose}
+              size="lg"
+              radius="md"
+              p="xs"
+            >
+              <Box style={{ height: "calc(50vh - 20px)" }}>
+                <ChatPanel
+                  onExpand={() => setExpanded(true)}
+                  onMoveToAside={() => setAsideChat(true)}
+                  onClose={handleClose}
+                  messages={messages}
+                  setMessages={setMessages}
+                  input={input}
+                  setInput={setInput}
+                  cursorPos={cursorPos}
+                  setCursorPos={setCursorPos}
+                />
+              </Box>
+            </Dialog>
+          </Container>
         </AppShell.Main>
         <AppShell.Aside p="xs">
           {asideChat && (
