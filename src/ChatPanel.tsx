@@ -1,4 +1,4 @@
-import { ActionIcon, Button, CloseButton, CopyButton, Flex, Group, Paper, ScrollArea, Stack, Text, Textarea, Tooltip } from "@mantine/core";
+import { ActionIcon, Alert, Button, CloseButton, CopyButton, Flex, Group, Paper, ScrollArea, Stack, Text, Textarea, Tooltip } from "@mantine/core";
 import {
   IconMaximize,
   IconMinimize,
@@ -13,11 +13,15 @@ import {
 } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 
-export type Message = { role: "user" | "agent"; text: string; deleted?: boolean };
+export type Message = { role: "user" | "agent"; text: string; deleted?: boolean; isError?: boolean };
 
-const fakeAgentReply = () =>
-  "Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil? Voluptatem accusantium doloremque laudantium totam rem aperiam eaque ipsa quae ab illo inventore veritatis."
-    .split(" ").slice(0, Math.floor(Math.random() * 30) + 5).join(" ") + ".";
+const fakeAgentReply = (): Pick<Message, "text" | "isError"> => {
+  if (Math.random() < 0.3) return { text: "Something went wrong. Please try again later.", isError: true };
+  return {
+    text: "Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil? Voluptatem accusantium doloremque laudantium totam rem aperiam eaque ipsa quae ab illo inventore veritatis."
+      .split(" ").slice(0, Math.floor(Math.random() * 30) + 5).join(" ") + ".",
+  };
+};
 
 interface ChatPanelProps {
   expanded?: boolean;
@@ -74,7 +78,7 @@ export function ChatPanel({
       const updated = [...prev];
       updated[index] = { role: "user", text: editText };
       // regenerate the immediately following agent message if present
-      if (updated[index + 1]?.role === "agent") updated[index + 1] = { role: "agent", text: fakeAgentReply() };
+      if (updated[index + 1]?.role === "agent") updated[index + 1] = { role: "agent", ...fakeAgentReply() };
       return updated;
     });
     setEditingIndex(null);
@@ -85,10 +89,7 @@ export function ChatPanel({
     setMessages((prev) => [
       ...prev,
       { role: "user", text: input },
-      {
-        role: "agent",
-        text: fakeAgentReply(),
-      },
+      { role: "agent", ...fakeAgentReply() },
     ]);
     setInput("");
     setTimeout(() => {
@@ -180,8 +181,10 @@ export function ChatPanel({
                               if (e.key === "Escape") setEditingIndex(null);
                             }}
                           />
+                        ) : m.isError ? (
+                          <Alert variant="light" color="red">{m.text}</Alert>
                         ) : (
-                          <Text size="sm" fw={500}>
+                          <Text size="sm" fw={500} style={{ whiteSpace: "pre-wrap" }}>
                             {m.text}
                           </Text>
                         )}
@@ -209,7 +212,7 @@ export function ChatPanel({
                               onClick={() =>
                                 setMessages((prev) => {
                                   const updated = [...prev];
-                                  updated[m._index] = { role: "agent", text: fakeAgentReply() };
+                                  updated[m._index] = { role: "agent", ...fakeAgentReply() };
                                   return updated;
                                 })
                               }
