@@ -9,6 +9,7 @@ import {
   MantineProvider,
   Text,
   Container,
+  createTheme,
 } from "@mantine/core";
 import "@mantine/core/styles.css";
 import { useDisclosure } from "@mantine/hooks";
@@ -16,6 +17,18 @@ import { useState } from "react";
 import { ChatPanel } from "./ChatPanel";
 import type { Message } from "./ChatPanel";
 import { IconMessageCircle } from "@tabler/icons-react";
+import classes from "./App.module.css";
+import cx from 'clsx';
+
+const theme = createTheme({
+  components: {
+    Container: Container.extend({
+      classNames: (_, { size }) => ({
+        root: cx({ [classes.responsiveContainer]: size === 'responsive' }),
+      }),
+    }),
+  },
+});
 
 function App() {
   const [opened, { toggle }] = useDisclosure();
@@ -51,7 +64,7 @@ function App() {
   };
 
   return (
-    <MantineProvider>
+    <MantineProvider theme={theme}>
       <AppShell
         padding="md"
         header={{ height: 60 }}
@@ -75,7 +88,7 @@ function App() {
         {/* <AppShell.Navbar>Navbar</AppShell.Navbar> */}
 
         <AppShell.Main style={{ overflow: "hidden" }}>
-          <Container>
+          <Container size="responsive">
             <Text component="span" onMouseUp={handleMouseUp} style={{ display: expanded ? "none" : undefined }}>
               {highlight ? (
                 <>
