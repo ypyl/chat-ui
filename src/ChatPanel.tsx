@@ -1,7 +1,6 @@
 import {
   ActionIcon,
   Alert,
-  Notification,
   Button,
   CloseButton,
   CopyButton,
@@ -14,7 +13,6 @@ import {
   Textarea,
   Tooltip,
   Divider,
-  Box,
 } from "@mantine/core";
 import {
   IconMaximize,
@@ -33,15 +31,14 @@ import { useEffect, useRef, useState } from "react";
 
 export type Message = { role: "user" | "agent"; text: string; deleted?: boolean; isError?: boolean };
 
-const fakeAgentReply = (): Pick<Message, "text" | "isError"> => {
-  if (Math.random() < 0.3) return { text: "Something went wrong. Please try again later.", isError: true };
-  return {
-    text:
-      "Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil? Voluptatem accusantium doloremque laudantium totam rem aperiam eaque ipsa quae ab illo inventore veritatis."
-        .split(" ")
-        .slice(0, Math.floor(Math.random() * 30) + 5)
-        .join(" ") + ".",
-  };
+const sendChatRequest = async (messages: Message[]): Promise<string> => {
+  const response = await fetch("/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(messages),
+  });
+  if (!response.ok) throw new Error("Failed to get response");
+  return response.text();
 };
 
 interface ChatPanelProps {
@@ -96,23 +93,54 @@ export function ChatPanel({
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const saveEdit = (index: number) => {
     if (!editText.trim()) return;
     setMessages((prev) => {
       const updated = [...prev];
       updated[index] = { role: "user", text: editText };
-      // regenerate the immediately following agent message if present
-      if (updated[index + 1]?.role === "agent") updated[index + 1] = { role: "agent", ...fakeAgentReply() };
       return updated;
     });
     setEditingIndex(null);
   };
 
-  const sendMessage = () => {
-    if (!input.trim()) return;
-    setMessages((prev) => [...prev, { role: "user", text: input }, { role: "agent", ...fakeAgentReply() }]);
+  const regenerateAgentMessage = async (index: number) => {
+    const messageList = messages.filter((m) => !m.deleted);
+    setIsLoading(true);
+    try {
+      const response = await sendChatRequest(messageList);
+      setMessages((prev) => {
+        const updated = [...prev];
+        updated[index] = { role: "agent", text: response };
+        return updated;
+      });
+    } catch {
+      setMessages((prev) => {
+        const updated = [...prev];
+        updated[index] = { role: "agent", text: "Failed to get response. Please try again.", isError: true };
+        return updated;
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!input.trim() || isLoading) return;
+    const userMessage = { role: "user" as const, text: input };
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setIsLoading(true);
+    try {
+      const allMessages = [...messages, userMessage];
+      const response = await sendChatRequest(allMessages);
+      setMessages((prev) => [...prev, { role: "agent", text: response }]);
+    } catch {
+      setMessages((prev) => [...prev, { role: "agent", text: "Failed to get response. Please try again.", isError: true }]);
+    } finally {
+      setIsLoading(false);
+    }
     setTimeout(() => {
       lastTurnRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
     }, 0);
@@ -250,13 +278,7 @@ export function ChatPanel({
                               size="xs"
                               variant="subtle"
                               color="gray"
-                              onClick={() =>
-                                setMessages((prev) => {
-                                  const updated = [...prev];
-                                  updated[m._index] = { role: "agent", ...fakeAgentReply() };
-                                  return updated;
-                                })
-                              }
+                              onClick={() => regenerateAgentMessage(m._index)}
                             >
                               <IconRefresh size={12} />
                             </ActionIcon>

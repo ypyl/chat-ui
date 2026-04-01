@@ -10,12 +10,11 @@ import {
   Container,
   createTheme,
   Paper,
-  Group,
   Button,
 } from "@mantine/core";
 import "@mantine/core/styles.css";
 import { useClickOutside, useDisclosure } from "@mantine/hooks";
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { ChatPanel } from "./ChatPanel";
 import type { Message } from "./ChatPanel";
 import { IconMessageCircle, IconQuote } from "@tabler/icons-react";
