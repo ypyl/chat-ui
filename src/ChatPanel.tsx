@@ -1,6 +1,7 @@
 import {
   ActionIcon,
   Alert,
+  Box,
   Button,
   CloseButton,
   CopyButton,
@@ -28,6 +29,8 @@ import {
   IconQuote,
 } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export type Message = { role: "user" | "agent"; text: string; deleted?: boolean; isError?: boolean };
 
@@ -134,10 +137,16 @@ export function ChatPanel({
     setIsLoading(true);
     try {
       const allMessages = [...messages, userMessage];
+      setTimeout(() => {
+        lastTurnRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+      }, 0);
       const response = await sendChatRequest(allMessages);
       setMessages((prev) => [...prev, { role: "agent", text: response }]);
     } catch {
-      setMessages((prev) => [...prev, { role: "agent", text: "Failed to get response. Please try again.", isError: true }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "agent", text: "Failed to get response. Please try again.", isError: true },
+      ]);
     } finally {
       setIsLoading(false);
     }
@@ -245,8 +254,45 @@ export function ChatPanel({
                           <Alert variant="light" color="red">
                             {m.text}
                           </Alert>
+                        ) : m.role === "agent" ? (
+                          <Box>
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              components={{
+                                p: ({ children }) => <Text size="sm">{children}</Text>,
+                                h1: ({ children }) => (
+                                  <Text size="lg" fw={700}>
+                                    {children}
+                                  </Text>
+                                ),
+                                h2: ({ children }) => (
+                                  <Text size="md" fw={600}>
+                                    {children}
+                                  </Text>
+                                ),
+                                h3: ({ children }) => (
+                                  <Text size="sm" fw={600}>
+                                    {children}
+                                  </Text>
+                                ),
+                                ul: ({ children }) => (
+                                  <Box component="ul" mt="xs" mb="xs">
+                                    {children}
+                                  </Box>
+                                ),
+                                li: ({ children }) => (
+                                  <li>
+                                    <Text span size="sm">{children}</Text>
+                                  </li>
+                                ),
+                                hr: () => <Divider my="xs"  />,
+                              }}
+                            >
+                              {m.text}
+                            </ReactMarkdown>
+                          </Box>
                         ) : (
-                          <Text size="sm" fw={500} style={{ whiteSpace: "pre-wrap" }}>
+                          <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
                             {m.text}
                           </Text>
                         )}

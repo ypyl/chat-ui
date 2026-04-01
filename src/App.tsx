@@ -11,6 +11,7 @@ import {
   createTheme,
   Paper,
   Button,
+  Portal,
 } from "@mantine/core";
 import "@mantine/core/styles.css";
 import { useClickOutside, useDisclosure } from "@mantine/hooks";
@@ -112,28 +113,34 @@ function App() {
 
         <AppShell.Main style={{ overflow: "hidden" }}>
           <Container size="responsive">
-            <Text onMouseUp={handleTextSelection}>{fullText}</Text>
+            {!(expanded && chatOpened) && (
+              <Text onMouseUp={handleTextSelection}>
+                {fullText}
+              </Text>
+            )}
 
             {popupOpened && selectionData.position && (
-              <Paper
-                shadow="sm"
-                style={{
-                  position: "fixed",
-                  top: selectionData.position.bottom,
-                  left: selectionData.position.left,
-                  transform: "translateX(-50%)",
-                  zIndex: 1000,
-                  cursor: "pointer",
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleExplainClick();
-                }}
-              >
-                <Button ref={popupRef} variant="outline" leftSection={<IconQuote size={16} />}>
-                  Explain
-                </Button>
-              </Paper>
+              <Portal>
+                <Paper
+                  shadow="sm"
+                  style={{
+                    position: "fixed",
+                    top: selectionData.position.bottom,
+                    left: selectionData.position.left,
+                    transform: "translateX(-50%)",
+                    zIndex: 1000,
+                    cursor: "pointer",
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleExplainClick();
+                  }}
+                >
+                  <Button ref={popupRef} variant="outline" leftSection={<IconQuote size={16} />}>
+                    Explain
+                  </Button>
+                </Paper>
+              </Portal>
             )}
 
             {expanded && chatOpened && (
