@@ -31,18 +31,9 @@ import {
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { fetchEventSource } from "@microsoft/fetch-event-source";
 
 export type Message = { role: "user" | "agent"; text: string; deleted?: boolean; isError?: boolean };
-
-const sendChatRequest = async (messages: Message[]): Promise<string> => {
-  const response = await fetch("/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(messages),
-  });
-  if (!response.ok) throw new Error("Failed to get response");
-  return response.text();
-};
 
 interface ChatPanelProps {
   expanded?: boolean;
@@ -111,12 +102,39 @@ export function ChatPanel({
   const regenerateAgentMessage = async (index: number) => {
     const messageList = messages.filter((m) => !m.deleted);
     setIsLoading(true);
+
+    let fullResponse = "";
+
+    setTimeout(() => {
+      lastTurnRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    }, 0);
+
     try {
-      const response = await sendChatRequest(messageList);
-      setMessages((prev) => {
-        const updated = [...prev];
-        updated[index] = { role: "agent", text: response };
-        return updated;
+      await fetchEventSource("/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(messageList),
+        onmessage(ev) {
+          if (ev.data) {
+            fullResponse += ev.data;
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[index] = { role: "agent", text: fullResponse };
+              return updated;
+            });
+          }
+        },
+        onclose() {
+          setIsLoading(false);
+        },
+        onerror() {
+          setMessages((prev) => {
+            const updated = [...prev];
+            updated[index] = { role: "agent", text: "Failed to get response. Please try again.", isError: true };
+            return updated;
+          });
+          setIsLoading(false);
+        },
       });
     } catch {
       setMessages((prev) => {
@@ -124,7 +142,6 @@ export function ChatPanel({
         updated[index] = { role: "agent", text: "Failed to get response. Please try again.", isError: true };
         return updated;
       });
-    } finally {
       setIsLoading(false);
     }
   };
@@ -132,27 +149,53 @@ export function ChatPanel({
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
     const userMessage = { role: "user" as const, text: input };
-    setMessages((prev) => [...prev, userMessage]);
+    const agentMessageId = messages.length + 1;
+    setMessages((prev) => [...prev, userMessage, { role: "agent", text: "" }]);
     setInput("");
     setIsLoading(true);
-    try {
-      const allMessages = [...messages, userMessage];
-      setTimeout(() => {
-        lastTurnRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
-      }, 0);
-      const response = await sendChatRequest(allMessages);
-      setMessages((prev) => [...prev, { role: "agent", text: response }]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "agent", text: "Failed to get response. Please try again.", isError: true },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
+
+    const allMessages = [...messages, userMessage];
+    let fullResponse = "";
+
     setTimeout(() => {
       lastTurnRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
     }, 0);
+
+    try {
+      await fetchEventSource("/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(allMessages),
+        onmessage(ev) {
+          if (ev.data) {
+            fullResponse += ev.data;
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[agentMessageId] = { role: "agent", text: fullResponse };
+              return updated;
+            });
+          }
+        },
+        onclose() {
+          setIsLoading(false);
+        },
+        onerror() {
+          setMessages((prev) => {
+            const updated = [...prev];
+            updated[agentMessageId] = { role: "agent", text: "Failed to get response. Please try again.", isError: true };
+            return updated;
+          });
+          setIsLoading(false);
+        },
+      });
+    } catch {
+      setMessages((prev) => {
+        const updated = [...prev];
+        updated[agentMessageId] = { role: "agent", text: "Failed to get response. Please try again.", isError: true };
+        return updated;
+      });
+      setIsLoading(false);
+    }
   };
 
   type IndexedMessage = Message & { _index: number };
@@ -285,7 +328,7 @@ export function ChatPanel({
                                     <Text span size="sm">{children}</Text>
                                   </li>
                                 ),
-                                hr: () => <Divider my="xs"  />,
+                                hr: () => <Divider my="xs" />,
                               }}
                             >
                               {m.text}
