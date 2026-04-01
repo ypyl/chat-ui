@@ -5,39 +5,41 @@ import {
   Box,
   Burger,
   Dialog,
-  Mark,
   MantineProvider,
   Text,
   Container,
   createTheme,
+  Paper,
+  Group,
+  Button,
 } from "@mantine/core";
 import "@mantine/core/styles.css";
-import { useDisclosure } from "@mantine/hooks";
-import { useState } from "react";
+import { useClickOutside, useDisclosure } from "@mantine/hooks";
+import { useState, useRef, useEffect } from "react";
 import { ChatPanel } from "./ChatPanel";
 import type { Message } from "./ChatPanel";
-import { IconMessageCircle } from "@tabler/icons-react";
+import { IconMessageCircle, IconQuote } from "@tabler/icons-react";
 import classes from "./App.module.css";
-import cx from 'clsx';
+import cx from "clsx";
 
 const theme = createTheme({
   components: {
     Container: Container.extend({
       classNames: (_, { size }) => ({
-        root: cx({ [classes.responsiveContainer]: size === 'responsive' }),
+        root: cx({ [classes.responsiveContainer]: size === "responsive" }),
       }),
     }),
   },
 });
 
 function App() {
+  // CHAT PANEL STATE
   const [opened, { toggle }] = useDisclosure();
   const [chatOpened, { open: openChat, close: closeChat }] = useDisclosure();
   const handleClose = () => {
     closeChat();
     setExpanded(false);
     setAsideChat(false);
-    setHighlight(null);
   };
   const [expanded, setExpanded] = useState(false);
   const [asideChat, setAsideChat] = useState(false);
@@ -46,21 +48,43 @@ function App() {
   const [cursorPos, setCursorPos] = useState<number | null>(null);
   const fullText =
     "Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?";
-  const [highlight, setHighlight] = useState<{ start: number; end: number } | null>(null);
 
-  const handleMouseUp = (e: React.MouseEvent<HTMLSpanElement>) => {
-    const selection = window.getSelection();
-    if (!selection || selection.isCollapsed) return;
-    const range = selection.getRangeAt(0);
-    const preRange = document.createRange();
-    preRange.selectNodeContents(e.currentTarget);
-    preRange.setEnd(range.startContainer, range.startOffset);
-    const start = preRange.toString().length;
-    const selected = range.toString();
-    setHighlight({ start, end: start + selected.length });
-    selection.removeAllRanges();
-    setMessages((prev) => [...prev, { role: "agent", text: `I can help explain: "${selected}"` }]);
-    openChat();
+  // SELECTION POPUP STATE
+  const [selectionData, setSelectionData] = useState<{
+    position: { bottom: number; left: number } | null;
+    text: string;
+  }>({
+    position: null,
+    text: "",
+  });
+  const [textToExplain, setTextToExplain] = useState(null as string | null);
+  const [popupOpened, setPopupOpened] = useState(false);
+  const popupRef = useClickOutside(() => setPopupOpened(false));
+
+  const handleExplainClick = () => {
+    if (selectionData.text) {
+      openChat();
+      setPopupOpened(false);
+      setTextToExplain(selectionData.text);
+    }
+  };
+
+  const handleTextSelection = () => {
+    setTimeout(() => {
+      const selection = window.getSelection();
+      if (selection && selection.toString().trim()) {
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        setSelectionData({
+          position: {
+            bottom: rect.top + window.scrollY - 45,
+            left: rect.left + rect.width / 2 + window.scrollX,
+          },
+          text: selection.toString().trim(),
+        });
+        setPopupOpened(true);
+      }
+    }, 10);
   };
 
   return (
@@ -89,19 +113,29 @@ function App() {
 
         <AppShell.Main style={{ overflow: "hidden" }}>
           <Container size="responsive">
-            <Text component="span" onMouseUp={handleMouseUp} style={{ display: expanded ? "none" : undefined }}>
-              {highlight ? (
-                <>
-                  {fullText.slice(0, highlight.start)}
-                  <Mark color="var(--mantine-color-blue-9)" style={{ color: "white" }}>
-                    {fullText.slice(highlight.start, highlight.end)}
-                  </Mark>
-                  {fullText.slice(highlight.end)}
-                </>
-              ) : (
-                fullText
-              )}
-            </Text>
+            <Text onMouseUp={handleTextSelection}>{fullText}</Text>
+
+            {popupOpened && selectionData.position && (
+              <Paper
+                shadow="sm"
+                style={{
+                  position: "fixed",
+                  top: selectionData.position.bottom,
+                  left: selectionData.position.left,
+                  transform: "translateX(-50%)",
+                  zIndex: 1000,
+                  cursor: "pointer",
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleExplainClick();
+                }}
+              >
+                <Button ref={popupRef} variant="outline" leftSection={<IconQuote size={16} />}>
+                  Explain
+                </Button>
+              </Paper>
+            )}
 
             {expanded && chatOpened && (
               <Box style={{ height: "calc(100vh - 100px)" }}>
@@ -119,6 +153,8 @@ function App() {
                   setInput={setInput}
                   cursorPos={cursorPos}
                   setCursorPos={setCursorPos}
+                  referencedText={textToExplain}
+                  onResetReferencedText={() => setTextToExplain(null)}
                 />
               </Box>
             )}
@@ -150,6 +186,8 @@ function App() {
                   setInput={setInput}
                   cursorPos={cursorPos}
                   setCursorPos={setCursorPos}
+                  referencedText={textToExplain}
+                  onResetReferencedText={() => setTextToExplain(null)}
                 />
               </Box>
             </Dialog>
@@ -169,6 +207,8 @@ function App() {
               setInput={setInput}
               cursorPos={cursorPos}
               setCursorPos={setCursorPos}
+              referencedText={textToExplain}
+              onResetReferencedText={() => setTextToExplain(null)}
             />
           )}
         </AppShell.Aside>

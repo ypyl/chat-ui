@@ -1,4 +1,21 @@
-import { ActionIcon, Alert, Button, CloseButton, CopyButton, Flex, Group, Paper, ScrollArea, Stack, Text, Textarea, Tooltip } from "@mantine/core";
+import {
+  ActionIcon,
+  Alert,
+  Notification,
+  Button,
+  CloseButton,
+  CopyButton,
+  Flex,
+  Group,
+  Paper,
+  ScrollArea,
+  Stack,
+  Text,
+  Textarea,
+  Tooltip,
+  Divider,
+  Box,
+} from "@mantine/core";
 import {
   IconMaximize,
   IconMinimize,
@@ -10,6 +27,7 @@ import {
   IconEdit,
   IconCheck,
   IconX,
+  IconQuote,
 } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -18,8 +36,11 @@ export type Message = { role: "user" | "agent"; text: string; deleted?: boolean;
 const fakeAgentReply = (): Pick<Message, "text" | "isError"> => {
   if (Math.random() < 0.3) return { text: "Something went wrong. Please try again later.", isError: true };
   return {
-    text: "Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil? Voluptatem accusantium doloremque laudantium totam rem aperiam eaque ipsa quae ab illo inventore veritatis."
-      .split(" ").slice(0, Math.floor(Math.random() * 30) + 5).join(" ") + ".",
+    text:
+      "Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil? Voluptatem accusantium doloremque laudantium totam rem aperiam eaque ipsa quae ab illo inventore veritatis."
+        .split(" ")
+        .slice(0, Math.floor(Math.random() * 30) + 5)
+        .join(" ") + ".",
   };
 };
 
@@ -35,6 +56,8 @@ interface ChatPanelProps {
   setInput: React.Dispatch<React.SetStateAction<string>>;
   cursorPos: number | null;
   setCursorPos: React.Dispatch<React.SetStateAction<number | null>>;
+  referencedText: string | null;
+  onResetReferencedText: () => void;
 }
 
 export function ChatPanel({
@@ -49,6 +72,8 @@ export function ChatPanel({
   setInput,
   cursorPos,
   setCursorPos,
+  referencedText,
+  onResetReferencedText,
 }: ChatPanelProps) {
   const viewport = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -86,11 +111,7 @@ export function ChatPanel({
 
   const sendMessage = () => {
     if (!input.trim()) return;
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", text: input },
-      { role: "agent", ...fakeAgentReply() },
-    ]);
+    setMessages((prev) => [...prev, { role: "user", text: input }, { role: "agent", ...fakeAgentReply() }]);
     setInput("");
     setTimeout(() => {
       lastTurnRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -109,14 +130,18 @@ export function ChatPanel({
   const deleteTurn = (turn: IndexedMessage[]) =>
     setMessages((prev) => {
       const updated = [...prev];
-      turn.forEach((m) => { updated[m._index] = { ...updated[m._index], deleted: true }; });
+      turn.forEach((m) => {
+        updated[m._index] = { ...updated[m._index], deleted: true };
+      });
       return updated;
     });
 
   const undoTurn = (turn: IndexedMessage[]) =>
     setMessages((prev) => {
       const updated = [...prev];
-      turn.forEach((m) => { updated[m._index] = { ...updated[m._index], deleted: false }; });
+      turn.forEach((m) => {
+        updated[m._index] = { ...updated[m._index], deleted: false };
+      });
       return updated;
     });
 
@@ -159,10 +184,17 @@ export function ChatPanel({
                 }}
               >
                 {turn[0]?.deleted ? (
-                  <Button variant="transparent" size="xs" p={4} onClick={() => undoTurn(turn)}>Restore deleted messages</Button>
+                  <Button variant="transparent" size="xs" p={4} onClick={() => undoTurn(turn)}>
+                    Restore deleted messages
+                  </Button>
                 ) : (
                   turn.map((m, j) => (
-                    <Stack key={j} gap={2} align={m.role === "user" ? "flex-end" : "flex-start"} className="chat-message">
+                    <Stack
+                      key={j}
+                      gap={2}
+                      align={m.role === "user" ? "flex-end" : "flex-start"}
+                      className="chat-message"
+                    >
                       <Stack gap="xs">
                         {editingIndex === m._index ? (
                           <Textarea
@@ -182,7 +214,9 @@ export function ChatPanel({
                             }}
                           />
                         ) : m.isError ? (
-                          <Alert variant="light" color="red">{m.text}</Alert>
+                          <Alert variant="light" color="red">
+                            {m.text}
+                          </Alert>
                         ) : (
                           <Text size="sm" fw={500} style={{ whiteSpace: "pre-wrap" }}>
                             {m.text}
@@ -191,13 +225,20 @@ export function ChatPanel({
                         <Group
                           gap="xs"
                           className="chat-delete-btn"
-                          justify={m.role === "user" ? editingIndex === m._index ? "space-between" : "flex-end" : undefined}
+                          justify={
+                            m.role === "user" ? (editingIndex === m._index ? "space-between" : "flex-end") : undefined
+                          }
                         >
                           {m.role === "agent" && (
                             <CopyButton value={m.text} timeout={2000}>
                               {({ copied, copy }) => (
                                 <Tooltip label={copied ? "Copied" : "Copy"} withArrow position="right">
-                                  <ActionIcon size="xs" color={copied ? "teal" : "gray"} variant="subtle" onClick={copy}>
+                                  <ActionIcon
+                                    size="xs"
+                                    color={copied ? "teal" : "gray"}
+                                    variant="subtle"
+                                    onClick={copy}
+                                  >
                                     {copied ? <IconCheck size={12} /> : <IconCopy size={12} />}
                                   </ActionIcon>
                                 </Tooltip>
@@ -243,12 +284,7 @@ export function ChatPanel({
                               </ActionIcon>
                             </Group>
                           )}
-                          <ActionIcon
-                            size="xs"
-                            variant="subtle"
-                            color="red"
-                            onClick={() => deleteTurn(turn)}
-                          >
+                          <ActionIcon size="xs" variant="subtle" color="red" onClick={() => deleteTurn(turn)}>
                             <IconTrash size={12} />
                           </ActionIcon>
                         </Group>
@@ -262,26 +298,41 @@ export function ChatPanel({
         </Stack>
       </ScrollArea>
 
-      <Paper shadow="xs" radius="md" p="xs">
+      <Paper shadow="xs" radius="md" p="sm">
         <Stack gap="xs" style={{ userSelect: "none" }}>
-          <Textarea
-            ref={textareaRef}
-            variant="unstyled"
-            autoFocus
-            placeholder="Type message..."
-            autosize
-            minRows={1}
-            maxRows={4}
-            value={input}
-            onChange={(e) => setInput(e.currentTarget.value)}
-            onSelect={(e) => setCursorPos(e.currentTarget.selectionStart)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-              }
-            }}
-          />
+          <Stack gap={0}>
+            {referencedText && (
+              <Stack gap="xs">
+                <Group justify="space-between" wrap="nowrap">
+                  <IconQuote size={16} />
+                  <Text truncate="end" size="sm" style={{ flex: 1, minWidth: 0 }}>
+                    {referencedText}
+                  </Text>
+
+                  <CloseButton size="xs" onClick={() => onResetReferencedText()} />
+                </Group>
+                <Divider />
+              </Stack>
+            )}
+            <Textarea
+              ref={textareaRef}
+              variant="unstyled"
+              autoFocus
+              placeholder="Type message..."
+              autosize
+              minRows={1}
+              maxRows={4}
+              value={input}
+              onChange={(e) => setInput(e.currentTarget.value)}
+              onSelect={(e) => setCursorPos(e.currentTarget.selectionStart)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+            />
+          </Stack>
           <Flex justify="flex-end">
             <ActionIcon color="blue" onClick={sendMessage}>
               <IconSend size={18} />
