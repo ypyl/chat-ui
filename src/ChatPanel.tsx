@@ -14,6 +14,8 @@ import {
   Textarea,
   Tooltip,
   Divider,
+  Table,
+  Title,
 } from "@mantine/core";
 import {
   IconMaximize,
@@ -304,19 +306,24 @@ export function ChatPanel({
                               components={{
                                 p: ({ children }) => <Text size="sm">{children}</Text>,
                                 h1: ({ children }) => (
-                                  <Text size="lg" fw={700}>
+                                  <Title order={3} fw={700}>
                                     {children}
-                                  </Text>
+                                  </Title>
                                 ),
                                 h2: ({ children }) => (
-                                  <Text size="md" fw={600}>
+                                  <Title order={4} fw={600}>
                                     {children}
-                                  </Text>
+                                  </Title>
                                 ),
                                 h3: ({ children }) => (
-                                  <Text size="sm" fw={600}>
+                                  <Title order={5} fw={600}>
                                     {children}
-                                  </Text>
+                                  </Title>
+                                ),
+                                h4: ({ children }) => (
+                                  <Title order={6} fw={600}>
+                                    {children}
+                                  </Title>
                                 ),
                                 ul: ({ children }) => (
                                   <Box component="ul" mt="xs" mb="xs">
@@ -329,6 +336,23 @@ export function ChatPanel({
                                   </li>
                                 ),
                                 hr: () => <Divider my="xs" />,
+                                table: ({ children }) => (
+                                  <Table>
+                                    {children}
+                                  </Table>),
+                                thead: ({ children }) => <Table.Thead>{children}</Table.Thead>,
+                                tr: ({ children }) => <Table.Tr>{children}</Table.Tr>,
+                                th: ({ children }) => (
+                                  <Table.Th>
+                                    {children}
+                                  </Table.Th>
+                                ),
+                                td: ({ children }) => (
+                                  <Table.Td>
+                                    {children}
+                                  </Table.Td>
+                                ),
+                                strong: ({ children }) => <Text size="sm" span fw={500}>{children}</Text>,
                               }}
                             >
                               {m.text}
