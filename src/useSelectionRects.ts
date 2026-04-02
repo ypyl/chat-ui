@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react";
 
-export function useSelectionRects() {
+type UseSelectionRectsOptions = {
+  ignoreSelector?: string;
+};
+
+export function useSelectionRects(options: UseSelectionRectsOptions = {}) {
   const [rects, setRects] = useState<DOMRect[]>([]);
 
   useEffect(() => {
@@ -17,7 +21,10 @@ export function useSelectionRects() {
       }, 10);
     };
 
-    const handleMouseDown = () => {
+    const handleMouseDown = (e: MouseEvent) => {
+      if (options.ignoreSelector && e.target instanceof Element && e.target.closest(options.ignoreSelector)) {
+        return;
+      }
       setRects([]);
     };
 
@@ -28,7 +35,7 @@ export function useSelectionRects() {
       document.removeEventListener("mouseup", handleMouseUp);
       document.removeEventListener("mousedown", handleMouseDown);
     };
-  }, []);
+  }, [options.ignoreSelector]);
 
   return rects;
 }

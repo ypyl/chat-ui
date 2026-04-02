@@ -1,11 +1,16 @@
 import { ActionIcon, Affix, AppShell, Box, Burger, Dialog, Text, Container, Button, Portal } from "@mantine/core";
 import "@mantine/core/styles.css";
-import { useClickOutside, useDisclosure } from "@mantine/hooks";
+import { useDisclosure } from "@mantine/hooks";
 import { useState } from "react";
 import { Link } from "wouter";
 import { ChatPanel } from "./ChatPanel";
 import type { Message } from "./ChatPanel";
 import { IconMessageCircle, IconQuote } from "@tabler/icons-react";
+import { useSelectionRects } from "./useSelectionRects";
+import { useSelectionEndPoint } from "./useSelectionEndPoint";
+
+const fullText =
+  "Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?";
 
 function App() {
   const [opened, { toggle }] = useDisclosure();
@@ -20,45 +25,21 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [cursorPos, setCursorPos] = useState<number | null>(null);
-  const fullText =
-    "Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?";
 
-  const [selectionData, setSelectionData] = useState<{
-    position: { bottom: number; left: number } | null;
-    text: string;
-  }>({
-    position: null,
-    text: "",
-  });
   const [textToExplain, setTextToExplain] = useState<string | null>(null);
-  const [popupOpened, setPopupOpened] = useState(false);
-  const popupRef = useClickOutside(() => setPopupOpened(false));
+  const rects = useSelectionRects({ ignoreSelector: "button" });
+  const endpoint = useSelectionEndPoint(rects);
 
   const handleExplainClick = () => {
-    if (selectionData.text) {
+    const selection = window.getSelection();
+    const text = selection?.toString().trim() || "";
+    if (text) {
       openChat();
-      setPopupOpened(false);
-      setTextToExplain(selectionData.text);
+      setTextToExplain(text);
     }
   };
 
-  const handleTextSelection = () => {
-    setTimeout(() => {
-      const selection = window.getSelection();
-      if (selection && selection.toString().trim()) {
-        const range = selection.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-        setSelectionData({
-          position: {
-            bottom: rect.top + window.scrollY - 45,
-            left: rect.left + rect.width / 2 + window.scrollX,
-          },
-          text: selection.toString().trim(),
-        });
-        setPopupOpened(true);
-      }
-    }, 10);
-  };
+  const showButton = rects.length > 0;
 
   return (
     <AppShell
@@ -81,31 +62,28 @@ function App() {
 
       <AppShell.Main style={{ overflow: "hidden" }}>
         <Container size="responsive">
-          {!(expanded && chatOpened) && <Text onMouseUp={handleTextSelection}>{fullText}</Text>}
+          {!(expanded && chatOpened) && <Text>{fullText}</Text>}
 
-          {popupOpened && selectionData.position && (
+          {endpoint && showButton && (
             <Portal>
-              <Box>
-                <Button
-                  ref={popupRef}
-                  variant="light"
-                  size="xs"
-                  leftSection={<IconQuote size={16} />}
-                  style={{
-                    position: "fixed",
-                    top: selectionData.position.bottom,
-                    left: selectionData.position.left,
-                    transform: "translateX(-50%)",
-                    zIndex: 1000,
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleExplainClick();
-                  }}
-                >
-                  Explain
-                </Button>
-              </Box>
+              <Button
+                variant="light"
+                size="xs"
+                leftSection={<IconQuote size={16} />}
+                style={{
+                  position: "fixed",
+                  left: `${endpoint.x + 8}px`,
+                  top: `${endpoint.y + 8}px`,
+                  transform: "translateX(-50%)",
+                  zIndex: 1000,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleExplainClick();
+                }}
+              >
+                Explain
+              </Button>
             </Portal>
           )}
 
