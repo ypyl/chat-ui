@@ -1,18 +1,7 @@
 import { Button, Card, Divider, Group, Stack, Text, Title } from "@mantine/core";
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { useSelectionAnchor, DIRECTIONS } from "./useSelectionAnchor";
-
-interface SelectionRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  top: number;
-  left: number;
-  right: number;
-  bottom: number;
-}
+import { useSelectionEndPoint } from "./useSelectionEndPoint";
 
 const sampleText = `Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?
 Lorem ipsum dolor sit amet <strong>consectetur adipisicing elit</strong>. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?
@@ -21,12 +10,8 @@ Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugi
 export function TextSelectionPage() {
   const [selectedText, setSelectedText] = useState("");
   const [showButton, setShowButton] = useState(false);
-  const [rects, setRects] = useState<SelectionRect[]>([]);
-  const anchor = useSelectionAnchor({
-    angle: DIRECTIONS.bottom,
-    margin: 8,
-    clampToViewport: true,
-  });
+  const [rects, setRects] = useState<DOMRect[]>([]);
+  const endpoint = useSelectionEndPoint(rects);
 
   useEffect(() => {
     const handleMouseUp = () => {
@@ -34,19 +19,14 @@ export function TextSelectionPage() {
         const selection = window.getSelection();
         if (selection && !selection.isCollapsed) {
           const range = selection.getRangeAt(0);
-          const clientRects = Array.from(range.getClientRects());
-          const newRects = clientRects.map((r) => ({
-            x: r.x,
-            y: r.y,
-            width: r.width,
-            height: r.height,
-            top: r.top,
+          const clientRects = range.getClientRects();
+          setRects(Array.from(clientRects));
+          console.log("[Selection] Rectangles:", Array.from(clientRects).map((r) => ({
             left: r.left,
+            top: r.top,
             right: r.right,
             bottom: r.bottom,
-          }));
-          setRects(newRects);
-          console.log("[Selection] Rectangles:", newRects);
+          })));
           setShowButton(true);
         }
       }, 10);
@@ -67,10 +47,10 @@ export function TextSelectionPage() {
   }, []);
 
   useEffect(() => {
-    if (anchor) {
-      console.log("[Selection] Anchor:", anchor);
+    if (endpoint) {
+      console.log("[Selection] Endpoint:", endpoint);
     }
-  }, [anchor]);
+  }, [endpoint]);
 
   const handleExplain = () => {
     const selection = window.getSelection();
@@ -82,8 +62,8 @@ export function TextSelectionPage() {
 
   const buttonStyle: React.CSSProperties = {
     position: "fixed",
-    left: anchor ? `${anchor.x}px` : 0,
-    top: anchor ? `${anchor.y}px` : 0,
+    left: endpoint ? `${endpoint.x + 8}px` : 0,
+    top: endpoint ? `${endpoint.y + 8}px` : 0,
     transform: "translateX(-50%)",
     zIndex: 1000,
   };
@@ -121,7 +101,7 @@ export function TextSelectionPage() {
           ))}
         </Stack>
 
-        {anchor && showButton && (
+        {endpoint && showButton && (
           <Button style={buttonStyle} color="blue" size="xs" onClick={handleExplain}>
             Explain
           </Button>
