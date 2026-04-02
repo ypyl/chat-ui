@@ -1,6 +1,7 @@
 import { Button, Card, Divider, Group, Stack, Text, Title } from "@mantine/core";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link } from "wouter";
+import { useSelectionRects } from "./useSelectionRects";
 import { useSelectionEndPoint } from "./useSelectionEndPoint";
 
 const sampleText = `Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?
@@ -9,48 +10,8 @@ Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugi
 
 export function TextSelectionPage() {
   const [selectedText, setSelectedText] = useState("");
-  const [showButton, setShowButton] = useState(false);
-  const [rects, setRects] = useState<DOMRect[]>([]);
+  const rects = useSelectionRects();
   const endpoint = useSelectionEndPoint(rects);
-
-  useEffect(() => {
-    const handleMouseUp = () => {
-      setTimeout(() => {
-        const selection = window.getSelection();
-        if (selection && !selection.isCollapsed) {
-          const range = selection.getRangeAt(0);
-          const clientRects = range.getClientRects();
-          setRects(Array.from(clientRects));
-          console.log("[Selection] Rectangles:", Array.from(clientRects).map((r) => ({
-            left: r.left,
-            top: r.top,
-            right: r.right,
-            bottom: r.bottom,
-          })));
-          setShowButton(true);
-        }
-      }, 10);
-    };
-
-    const handleMouseDown = () => {
-      setShowButton(false);
-      setRects([]);
-    };
-
-    document.addEventListener("mouseup", handleMouseUp);
-    document.addEventListener("mousedown", handleMouseDown);
-
-    return () => {
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.removeEventListener("mousedown", handleMouseDown);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (endpoint) {
-      console.log("[Selection] Endpoint:", endpoint);
-    }
-  }, [endpoint]);
 
   const handleExplain = () => {
     const selection = window.getSelection();
@@ -59,6 +20,8 @@ export function TextSelectionPage() {
       setSelectedText(text);
     }
   };
+
+  const showButton = rects.length > 0;
 
   const buttonStyle: React.CSSProperties = {
     position: "fixed",
