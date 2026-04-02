@@ -1,4 +1,4 @@
-import { ActionIcon, Affix, AppShell, Box, Burger, Dialog, Text, Container, Button, Portal } from "@mantine/core";
+import { ActionIcon, Affix, AppShell, Box, Burger, Dialog, Text, Container, Portal } from "@mantine/core";
 import "@mantine/core/styles.css";
 import { useDisclosure } from "@mantine/hooks";
 import { useState } from "react";
@@ -66,10 +66,10 @@ function App() {
 
             {endpoint && showButton && (
               <Portal>
-                <Button
+                <ActionIcon
                   variant="light"
-                  size="xs"
-                  leftSection={<IconQuote size={16} />}
+                  size="md"
+                  aria-label="Explain selected text"
                   style={{
                     position: "fixed",
                     left: `${endpoint.x + 8}px`,
@@ -82,8 +82,8 @@ function App() {
                     handleExplainClick();
                   }}
                 >
-                  Explain
-                </Button>
+                  <IconQuote size={16} />
+                </ActionIcon>
               </Portal>
             )}
 

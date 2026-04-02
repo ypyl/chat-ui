@@ -1,4 +1,5 @@
-import { Button, Card, Divider, Group, Stack, Text, Title } from "@mantine/core";
+import { ActionIcon, Button, Card, Divider, Group, Stack, Text, Title } from "@mantine/core";
+import { IconQuote } from "@tabler/icons-react";
 import { useState } from "react";
 import { Link } from "wouter";
 import { useSelectionRects } from "./useSelectionRects";
@@ -65,9 +66,15 @@ export function TextSelectionPage() {
         </Stack>
 
         {endpoint && showButton && (
-          <Button style={buttonStyle} color="blue" size="xs" onClick={handleExplain}>
-            Explain
-          </Button>
+          <ActionIcon
+            variant="light"
+            size="md"
+            aria-label="Explain selected text"
+            style={buttonStyle}
+            onClick={handleExplain}
+          >
+            <IconQuote size={16} />
+          </ActionIcon>
         )}
       </Card>
 
