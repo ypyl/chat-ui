@@ -34,8 +34,8 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-
-export type Message = { role: "user" | "agent"; text: string; deleted?: boolean; isError?: boolean };
+import { useChat } from "./ChatContext";
+import type { Message } from "./ChatContext";
 
 interface ChatPanelProps {
   expanded?: boolean;
@@ -43,14 +43,8 @@ interface ChatPanelProps {
   onMinimize?: () => void;
   onClose?: () => void;
   onMoveToAside?: () => void;
-  messages: Message[];
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-  input: string;
-  setInput: React.Dispatch<React.SetStateAction<string>>;
-  cursorPos: number | null;
-  setCursorPos: React.Dispatch<React.SetStateAction<number | null>>;
-  referencedText: string | null;
-  onResetReferencedText: () => void;
+  referencedText?: string | null;
+  onResetReferencedText?: () => void;
 }
 
 export function ChatPanel({
@@ -59,15 +53,10 @@ export function ChatPanel({
   onMinimize,
   onClose,
   onMoveToAside,
-  messages,
-  setMessages,
-  input,
-  setInput,
-  cursorPos,
-  setCursorPos,
   referencedText,
   onResetReferencedText,
 }: ChatPanelProps) {
+  const { messages, setMessages, input, setInput, cursorPos, setCursorPos } = useChat();
   const viewport = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -444,7 +433,7 @@ export function ChatPanel({
                     {referencedText}
                   </Text>
 
-                  <CloseButton size="xs" onClick={() => onResetReferencedText()} />
+                  <CloseButton size="xs" onClick={() => onResetReferencedText?.()} />
                 </Group>
                 <Divider />
               </Stack>
