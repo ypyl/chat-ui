@@ -1,6 +1,7 @@
-import { Box, Button, Card, Divider, Group, Stack, Text, Title, Code, ScrollArea } from "@mantine/core";
-import { useEffect, useRef, useState } from "react";
+import { Button, Card, Divider, Group, Stack, Text, Title } from "@mantine/core";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
+import { useSelectionAnchor, DIRECTIONS } from "./useSelectionAnchor";
 
 interface SelectionRect {
   x: number;
@@ -18,55 +19,40 @@ Lorem ipsum dolor sit amet <strong>consectetur adipisicing elit</strong>. Unde p
 Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?`;
 
 export function TextSelectionPage() {
-  const [rects, setRects] = useState<SelectionRect[]>([]);
   const [selectedText, setSelectedText] = useState("");
   const [showButton, setShowButton] = useState(false);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  const getSelectionRects = (): SelectionRect[] => {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return [];
-    const range = selection.getRangeAt(0);
-    if (selection.isCollapsed) return [];
-
-    return Array.from(range.getClientRects())
-      .filter((r) => r.width > 0 && r.height > 0)
-      .map((r) => ({
-        x: r.x,
-        y: r.y,
-        width: r.width,
-        height: r.height,
-        top: r.top,
-        left: r.left,
-        right: r.right,
-        bottom: r.bottom,
-      }));
-  };
+  const [rects, setRects] = useState<SelectionRect[]>([]);
+  const anchor = useSelectionAnchor({
+    angle: DIRECTIONS.bottom,
+    margin: 8,
+    clampToViewport: true,
+  });
 
   useEffect(() => {
     const handleMouseUp = () => {
       setTimeout(() => {
-        const selectionRects = getSelectionRects();
         const selection = window.getSelection();
-        const text = selection?.toString().trim() || "";
-
-        if (selectionRects.length > 0) {
-          setRects(selectionRects);
-          setSelectedText(text);
+        if (selection && !selection.isCollapsed) {
+          const range = selection.getRangeAt(0);
+          const clientRects = Array.from(range.getClientRects());
+          const newRects = clientRects.map((r) => ({
+            x: r.x,
+            y: r.y,
+            width: r.width,
+            height: r.height,
+            top: r.top,
+            left: r.left,
+            right: r.right,
+            bottom: r.bottom,
+          }));
+          setRects(newRects);
+          console.log("[Selection] Rectangles:", newRects);
           setShowButton(true);
-        } else {
-          setRects([]);
-          setSelectedText("");
-          setShowButton(false);
         }
-      }, 0);
+      }, 10);
     };
 
-    const handleMouseDown = (e: MouseEvent) => {
-      if (buttonRef.current && buttonRef.current.contains(e.target as Node)) {
-        return;
-      }
+    const handleMouseDown = () => {
       setShowButton(false);
       setRects([]);
     };
@@ -80,14 +66,25 @@ export function TextSelectionPage() {
     };
   }, []);
 
-  const firstRect = rects[0];
-  const lastRect = rects[rects.length - 1];
+  useEffect(() => {
+    if (anchor) {
+      console.log("[Selection] Anchor:", anchor);
+    }
+  }, [anchor]);
+
+  const handleExplain = () => {
+    const selection = window.getSelection();
+    const text = selection?.toString().trim() || "";
+    if (text) {
+      setSelectedText(text);
+    }
+  };
 
   const buttonStyle: React.CSSProperties = {
     position: "fixed",
-    display: showButton ? "block" : "none",
-    left: firstRect ? `${firstRect.left}px` : 0,
-    top: lastRect ? `${lastRect.bottom + 8}px` : 0,
+    left: anchor ? `${anchor.x}px` : 0,
+    top: anchor ? `${anchor.y}px` : 0,
+    transform: "translateX(-50%)",
     zIndex: 1000,
   };
 
@@ -101,11 +98,11 @@ export function TextSelectionPage() {
       </Group>
 
       <Text c="dimmed">
-        Select any text below to see the selection rectangles. This demo shows how to properly
-        handle multi-line text selections using Range.getClientRects().
+        Select any text below to see the selection anchor hook in action. The button appears
+        below the selection using the useSelectionAnchor hook.
       </Text>
 
-      <Card ref={contentRef} withBorder padding="lg" style={{ userSelect: "text", position: "relative" }}>
+      <Card withBorder padding="lg" style={{ userSelect: "text" }}>
         <Stack gap="md">
           {sampleText.split("\n\n").map((paragraph, i) => (
             <Text key={i} style={{ whiteSpace: "pre-wrap" }}>
@@ -124,45 +121,32 @@ export function TextSelectionPage() {
           ))}
         </Stack>
 
-        {rects.map((rect, i) => (
-          <Box
-            key={i}
-            style={{
-              position: "fixed",
-              left: `${rect.left}px`,
-              top: `${rect.top}px`,
-              width: `${rect.width}px`,
-              height: `${rect.height}px`,
-              background: "rgba(255, 255, 0, 0.3)",
-              borderRadius: "2px",
-              pointerEvents: "none",
-            }}
-          />
-        ))}
-
-        <Button ref={buttonRef} style={buttonStyle} color="blue" size="xs">
-          Explain
-        </Button>
+        {anchor && showButton && (
+          <Button style={buttonStyle} color="blue" size="xs" onClick={handleExplain}>
+            Explain
+          </Button>
+        )}
       </Card>
 
       <Divider />
-
-      <Stack gap="xs">
-        <Title order={4}>Selection Rectangles:</Title>
-        <ScrollArea>
-          <Code block style={{ maxHeight: 200 }}>
-            {rects.length > 0
-              ? JSON.stringify(rects, null, 2)
-              : "No selection"}
-          </Code>
-        </ScrollArea>
-      </Stack>
 
       <Stack gap="xs">
         <Title order={4}>Selected Text:</Title>
         <Text c={selectedText ? undefined : "dimmed"} fw={selectedText ? 500 : 400}>
           {selectedText || "No text selected"}
         </Text>
+      </Stack>
+
+      <Stack gap="xs">
+        <Title order={4}>Selection Rectangles:</Title>
+        <Text c="dimmed" size="xs">
+          {rects.length > 0 ? `${rects.length} rectangle(s)` : "No selection"}
+        </Text>
+        {rects.map((rect, i) => (
+          <Text key={i} size="xs" c="dimmed">
+            #{i + 1}: left={rect.left.toFixed(0)}, top={rect.top.toFixed(0)}, width={rect.width.toFixed(0)}, height={rect.height.toFixed(0)}
+          </Text>
+        ))}
       </Stack>
     </Stack>
   );
