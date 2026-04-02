@@ -7,7 +7,6 @@ import {
   CopyButton,
   Flex,
   Group,
-  Paper,
   ScrollArea,
   Stack,
   Text,
@@ -16,6 +15,7 @@ import {
   Divider,
   Table,
   Title,
+  Paper,
 } from "@mantine/core";
 import {
   IconMaximize,
@@ -173,7 +173,11 @@ export function ChatPanel({
         onerror() {
           setMessages((prev) => {
             const updated = [...prev];
-            updated[agentMessageId] = { role: "agent", text: "Failed to get response. Please try again.", isError: true };
+            updated[agentMessageId] = {
+              role: "agent",
+              text: "Failed to get response. Please try again.",
+              isError: true,
+            };
             return updated;
           });
           setIsLoading(false);
@@ -321,36 +325,33 @@ export function ChatPanel({
                                 ),
                                 li: ({ children }) => (
                                   <li>
-                                    <Text span size="sm">{children}</Text>
+                                    <Text span size="sm">
+                                      {children}
+                                    </Text>
                                   </li>
                                 ),
                                 hr: () => <Divider my="xs" />,
-                                table: ({ children }) => (
-                                  <Table>
-                                    {children}
-                                  </Table>),
+                                table: ({ children }) => <Table>{children}</Table>,
                                 thead: ({ children }) => <Table.Thead>{children}</Table.Thead>,
                                 tr: ({ children }) => <Table.Tr>{children}</Table.Tr>,
-                                th: ({ children }) => (
-                                  <Table.Th>
+                                th: ({ children }) => <Table.Th>{children}</Table.Th>,
+                                td: ({ children }) => <Table.Td>{children}</Table.Td>,
+                                strong: ({ children }) => (
+                                  <Text size="sm" span fw={500}>
                                     {children}
-                                  </Table.Th>
+                                  </Text>
                                 ),
-                                td: ({ children }) => (
-                                  <Table.Td>
-                                    {children}
-                                  </Table.Td>
-                                ),
-                                strong: ({ children }) => <Text size="sm" span fw={500}>{children}</Text>,
                               }}
                             >
                               {m.text}
                             </ReactMarkdown>
                           </Box>
                         ) : (
-                          <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
-                            {m.text}
-                          </Text>
+                          <Paper p="xs" bg="var(--mantine-color-blue-light)" radius="md">
+                            <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
+                              {m.text}
+                            </Text>
+                          </Paper>
                         )}
                         <Group
                           gap="xs"
@@ -422,11 +423,23 @@ export function ChatPanel({
         </Stack>
       </ScrollArea>
 
-      <Paper shadow="xs" radius="md" p="sm">
+      <Paper shadow="xs" radius="md">
         <Stack gap="xs" style={{ userSelect: "none" }}>
           <Stack gap={0}>
             {referencedText && (
-              <Stack gap="xs">
+              <Paper
+                pl="sm"
+                pr="sm"
+                pb="xs"
+                pt="sm"
+                bg="var(--mantine-color-blue-light)"
+                style={{
+                  borderTopLeftRadius: "var(--mantine-radius-md)",
+                  borderTopRightRadius: "var(--mantine-radius-md)",
+                  borderBottomRightRadius: 0,
+                  borderBottomLeftRadius: 0,
+                }}
+              >
                 <Group justify="space-between" wrap="nowrap">
                   <IconQuote size={16} />
                   <Text truncate="end" size="sm" style={{ flex: 1, minWidth: 0 }}>
@@ -435,27 +448,28 @@ export function ChatPanel({
 
                   <CloseButton size="xs" onClick={() => onResetReferencedText?.()} />
                 </Group>
-                <Divider />
-              </Stack>
+              </Paper>
             )}
-            <Textarea
-              ref={textareaRef}
-              variant="unstyled"
-              autoFocus
-              placeholder="Type message..."
-              autosize
-              minRows={1}
-              maxRows={4}
-              value={input}
-              onChange={(e) => setInput(e.currentTarget.value)}
-              onSelect={(e) => setCursorPos(e.currentTarget.selectionStart)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-            />
+            <Box pl="sm" pr="sm">
+              <Textarea
+                ref={textareaRef}
+                variant="unstyled"
+                autoFocus
+                placeholder="Type message..."
+                autosize
+                minRows={1}
+                maxRows={4}
+                value={input}
+                onChange={(e) => setInput(e.currentTarget.value)}
+                onSelect={(e) => setCursorPos(e.currentTarget.selectionStart)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                }}
+              />
+            </Box>
           </Stack>
           <Flex justify="flex-end">
             <ActionIcon color="blue" onClick={sendMessage}>
