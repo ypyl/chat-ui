@@ -4,7 +4,7 @@ import { useDisclosure } from "@mantine/hooks";
 import { useState } from "react";
 import { Link } from "wouter";
 import { ChatPanel } from "./ChatPanel";
-import { ChatProvider } from "./ChatContext";
+import { ChatProvider } from "./context/ChatProvider";
 import { IconMessageCircle, IconQuote } from "@tabler/icons-react";
 import { useSelectionRects } from "./useSelectionRects";
 import { useSelectionEndPoint } from "./useSelectionEndPoint";

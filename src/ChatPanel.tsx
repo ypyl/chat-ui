@@ -1,41 +1,14 @@
-import {
-  ActionIcon,
-  Alert,
-  Box,
-  Button,
-  CloseButton,
-  CopyButton,
-  Flex,
-  Group,
-  ScrollArea,
-  Stack,
-  Text,
-  Textarea,
-  Tooltip,
-  Divider,
-  Table,
-  Title,
-  Paper,
-} from "@mantine/core";
+import { ActionIcon, CloseButton, Group, ScrollArea, Stack, Text } from "@mantine/core";
 import {
   IconMaximize,
   IconMinimize,
   IconLayoutSidebarRight,
-  IconSend,
-  IconTrash,
-  IconCopy,
-  IconRefresh,
-  IconEdit,
-  IconCheck,
-  IconX,
-  IconQuote,
 } from "@tabler/icons-react";
-import { useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { useChat } from "./ChatContext";
-import type { Message } from "./ChatContext";
+import { useMessages, type Message } from "./context/MessagesContext";
+import { ChatInput } from "./components/ChatInput";
+import { MessageBubble } from "./components/MessageBubble";
 
 interface ChatPanelProps {
   expanded?: boolean;
@@ -56,11 +29,11 @@ export function ChatPanel({
   referencedText,
   onResetReferencedText,
 }: ChatPanelProps) {
-  const { messages, setMessages, input, setInput, cursorPos, setCursorPos } = useChat();
+  const { messages, setMessages } = useMessages();
   const viewport = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
   const lastTurnRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (viewport.current) setViewportHeight(viewport.current.clientHeight);
@@ -69,28 +42,24 @@ export function ChatPanel({
     }, 0);
   }, []);
 
-  useEffect(() => {
-    if (cursorPos !== null && textareaRef.current) {
-      textareaRef.current.focus();
-      textareaRef.current.setSelectionRange(cursorPos, cursorPos);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editText, setEditText] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-
-  const saveEdit = (index: number) => {
-    if (!editText.trim()) return;
+  const saveEdit = useCallback((index: number, text: string) => {
     setMessages((prev) => {
       const updated = [...prev];
-      updated[index] = { role: "user", text: editText };
+      updated[index] = { role: "user", text };
       return updated;
     });
-    setEditingIndex(null);
-  };
+  }, [setMessages]);
 
-  const regenerateAgentMessage = async (index: number) => {
+  const deleteTurn = useCallback((indexes: number[]) =>
+    setMessages((prev) => {
+      const updated = [...prev];
+      indexes.forEach((idx) => {
+        updated[idx] = { ...updated[idx], deleted: true };
+      });
+      return updated;
+    }), [setMessages]);
+
+  const regenerateAgentMessage = useCallback(async (index: number) => {
     const messageList = messages.filter((m) => !m.deleted);
     setIsLoading(true);
 
@@ -135,9 +104,9 @@ export function ChatPanel({
       });
       setIsLoading(false);
     }
-  };
+  }, [messages, setMessages]);
 
-  const sendMessage = async () => {
+  const sendMessage = useCallback(async (input: string, setInput: (v: string) => void) => {
     if (!input.trim() || isLoading) return;
     const userMessage = { role: "user" as const, text: input };
     const agentMessageId = messages.length + 1;
@@ -191,34 +160,14 @@ export function ChatPanel({
       });
       setIsLoading(false);
     }
-  };
+  }, [messages, setMessages, isLoading]);
 
-  type IndexedMessage = Message & { _index: number };
-  const turns = messages.reduce<IndexedMessage[][]>((acc, m, i) => {
-    const entry: IndexedMessage = { ...m, _index: i };
-    if (m.role === "user") acc.push([entry]);
-    else if (acc.length > 0) acc[acc.length - 1].push(entry);
-    else acc.push([entry]);
+  const turns = messages.reduce<Message[][]>((acc, m) => {
+    if (m.role === "user") acc.push([m]);
+    else if (acc.length > 0) acc[acc.length - 1].push(m);
+    else acc.push([m]);
     return acc;
   }, []);
-
-  const deleteTurn = (turn: IndexedMessage[]) =>
-    setMessages((prev) => {
-      const updated = [...prev];
-      turn.forEach((m) => {
-        updated[m._index] = { ...updated[m._index], deleted: true };
-      });
-      return updated;
-    });
-
-  const undoTurn = (turn: IndexedMessage[]) =>
-    setMessages((prev) => {
-      const updated = [...prev];
-      turn.forEach((m) => {
-        updated[m._index] = { ...updated[m._index], deleted: false };
-      });
-      return updated;
-    });
 
   return (
     <Stack gap="xs" style={{ height: "100%" }}>
@@ -253,15 +202,15 @@ export function ChatPanel({
                 ref={isLast ? lastTurnRef : undefined}
                 gap="xs"
                 style={{
-                  minHeight: isLast ? viewportHeight || "100%" : undefined, // ← only last turn
+                  minHeight: isLast ? viewportHeight || "100%" : undefined,
                   justifyContent: "flex-start",
                   paddingTop: "var(--mantine-spacing-xs)",
                 }}
               >
                 {turn[0]?.deleted ? (
-                  <Button variant="transparent" size="xs" p={4} onClick={() => undoTurn(turn)}>
-                    Restore deleted messages
-                  </Button>
+                  <Text c="dimmed" size="sm" fs="italic">
+                    Messages deleted
+                  </Text>
                 ) : (
                   turn.map((m, j) => (
                     <Stack
@@ -270,150 +219,13 @@ export function ChatPanel({
                       align={m.role === "user" ? "flex-end" : "flex-start"}
                       className="chat-message"
                     >
-                      <Stack gap="xs">
-                        {editingIndex === m._index ? (
-                          <Textarea
-                            autoFocus
-                            autosize
-                            minRows={1}
-                            maxRows={4}
-                            size="sm"
-                            value={editText}
-                            onChange={(e) => setEditText(e.currentTarget.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                saveEdit(m._index);
-                              }
-                              if (e.key === "Escape") setEditingIndex(null);
-                            }}
-                          />
-                        ) : m.isError ? (
-                          <Alert variant="light" color="red">
-                            {m.text}
-                          </Alert>
-                        ) : m.role === "agent" ? (
-                          <Box>
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                              components={{
-                                p: ({ children }) => <Text size="sm">{children}</Text>,
-                                h1: ({ children }) => (
-                                  <Title order={3} fw={700}>
-                                    {children}
-                                  </Title>
-                                ),
-                                h2: ({ children }) => (
-                                  <Title order={4} fw={600}>
-                                    {children}
-                                  </Title>
-                                ),
-                                h3: ({ children }) => (
-                                  <Title order={5} fw={600}>
-                                    {children}
-                                  </Title>
-                                ),
-                                h4: ({ children }) => (
-                                  <Title order={6} fw={600}>
-                                    {children}
-                                  </Title>
-                                ),
-                                ul: ({ children }) => (
-                                  <Box component="ul" mt="xs" mb="xs">
-                                    {children}
-                                  </Box>
-                                ),
-                                li: ({ children }) => (
-                                  <li>
-                                    <Text span size="sm">
-                                      {children}
-                                    </Text>
-                                  </li>
-                                ),
-                                hr: () => <Divider my="xs" />,
-                                table: ({ children }) => <Table>{children}</Table>,
-                                thead: ({ children }) => <Table.Thead>{children}</Table.Thead>,
-                                tr: ({ children }) => <Table.Tr>{children}</Table.Tr>,
-                                th: ({ children }) => <Table.Th>{children}</Table.Th>,
-                                td: ({ children }) => <Table.Td>{children}</Table.Td>,
-                                strong: ({ children }) => (
-                                  <Text size="sm" span fw={500}>
-                                    {children}
-                                  </Text>
-                                ),
-                              }}
-                            >
-                              {m.text}
-                            </ReactMarkdown>
-                          </Box>
-                        ) : (
-                          <Paper p="xs" bg="var(--mantine-color-blue-light)" radius="md">
-                            <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
-                              {m.text}
-                            </Text>
-                          </Paper>
-                        )}
-                        <Group
-                          gap="xs"
-                          className="chat-delete-btn"
-                          justify={
-                            m.role === "user" ? (editingIndex === m._index ? "space-between" : "flex-end") : undefined
-                          }
-                        >
-                          {m.role === "agent" && (
-                            <CopyButton value={m.text} timeout={2000}>
-                              {({ copied, copy }) => (
-                                <Tooltip label={copied ? "Copied" : "Copy"} withArrow position="right">
-                                  <ActionIcon
-                                    size="xs"
-                                    color={copied ? "teal" : "gray"}
-                                    variant="subtle"
-                                    onClick={copy}
-                                  >
-                                    {copied ? <IconCheck size={12} /> : <IconCopy size={12} />}
-                                  </ActionIcon>
-                                </Tooltip>
-                              )}
-                            </CopyButton>
-                          )}
-                          {m.role === "agent" && (
-                            <ActionIcon
-                              size="xs"
-                              variant="subtle"
-                              color="gray"
-                              onClick={() => regenerateAgentMessage(m._index)}
-                            >
-                              <IconRefresh size={12} />
-                            </ActionIcon>
-                          )}
-                          {m.role === "user" && editingIndex !== m._index && (
-                            <ActionIcon
-                              size="xs"
-                              variant="subtle"
-                              color="gray"
-                              onClick={() => {
-                                setEditingIndex(m._index);
-                                setEditText(m.text);
-                              }}
-                            >
-                              <IconEdit size={12} />
-                            </ActionIcon>
-                          )}
-                          {m.role === "user" && editingIndex === m._index && (
-                            <Group gap="xs">
-                              <ActionIcon size="xs" variant="subtle" color="green" onClick={() => saveEdit(m._index)}>
-                                <IconCheck size={12} />
-                              </ActionIcon>
-                              <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setEditingIndex(null)}>
-                                <IconX size={12} />
-                              </ActionIcon>
-                            </Group>
-                          )}
-                          <ActionIcon size="xs" variant="subtle" color="red" onClick={() => deleteTurn(turn)}>
-                            <IconTrash size={12} />
-                          </ActionIcon>
-                        </Group>
-                      </Stack>
+                      <MessageBubble
+                        message={m}
+                        index={j}
+                        onSaveEdit={saveEdit}
+                        onDeleteTurn={deleteTurn}
+                        onRegenerate={regenerateAgentMessage}
+                      />
                     </Stack>
                   ))
                 )}
@@ -423,61 +235,11 @@ export function ChatPanel({
         </Stack>
       </ScrollArea>
 
-      <Paper shadow="xs" radius="md">
-        <Stack gap="xs" style={{ userSelect: "none" }}>
-          <Stack gap={0}>
-            {referencedText && (
-              <Paper
-                pl="sm"
-                pr="sm"
-                pb="xs"
-                pt="sm"
-                bg="var(--mantine-color-blue-light)"
-                style={{
-                  borderTopLeftRadius: "var(--mantine-radius-md)",
-                  borderTopRightRadius: "var(--mantine-radius-md)",
-                  borderBottomRightRadius: 0,
-                  borderBottomLeftRadius: 0,
-                }}
-              >
-                <Group justify="space-between" wrap="nowrap">
-                  <IconQuote size={16} />
-                  <Text truncate="end" size="sm" style={{ flex: 1, minWidth: 0 }}>
-                    {referencedText}
-                  </Text>
-
-                  <CloseButton size="xs" onClick={() => onResetReferencedText?.()} />
-                </Group>
-              </Paper>
-            )}
-            <Box pl="sm" pr="sm">
-              <Textarea
-                ref={textareaRef}
-                variant="unstyled"
-                autoFocus
-                placeholder="Type message..."
-                autosize
-                minRows={1}
-                maxRows={4}
-                value={input}
-                onChange={(e) => setInput(e.currentTarget.value)}
-                onSelect={(e) => setCursorPos(e.currentTarget.selectionStart)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                  }
-                }}
-              />
-            </Box>
-          </Stack>
-          <Flex justify="flex-end">
-            <ActionIcon color="blue" onClick={sendMessage}>
-              <IconSend size={18} />
-            </ActionIcon>
-          </Flex>
-        </Stack>
-      </Paper>
+      <ChatInput
+        referencedText={referencedText}
+        onResetReferencedText={onResetReferencedText}
+        onSend={sendMessage}
+      />
     </Stack>
   );
 }
