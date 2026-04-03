@@ -1,7 +1,8 @@
 import { ActionIcon, Affix, AppShell, Box, Burger, Dialog, Text, Container, Portal } from "@mantine/core";
 import "@mantine/core/styles.css";
 import { useDisclosure } from "@mantine/hooks";
-import { useState } from "react";
+import { useRef, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "wouter";
 import { ChatPanel } from "./ChatPanel";
 import { ChatProvider } from "./context/ChatProvider";
@@ -12,26 +13,38 @@ import { useSelectionEndPoint } from "./useSelectionEndPoint";
 const fullText =
   "Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?";
 
+type ChatView = "affix" | "dialog" | "expanded" | "aside";
+
 function App() {
   const [opened, { toggle }] = useDisclosure();
-  const [chatOpened, { open: openChat, close: closeChat }] = useDisclosure();
-  const handleClose = () => {
-    closeChat();
-    setExpanded(false);
-    setAsideChat(false);
-  };
-  const [expanded, setExpanded] = useState(false);
-  const [asideChat, setAsideChat] = useState(false);
+  const [chatView, setChatView] = useState<ChatView>("affix");
   const [textToExplain, setTextToExplain] = useState<string | null>(null);
   const rects = useSelectionRects({ ignoreSelector: "button" });
   const endpoint = useSelectionEndPoint(rects);
+
+  const asideRef = useRef<HTMLDivElement>(null);
+  const [asidePortalContainer, setAsidePortalContainer] = useState<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (chatView === "aside") {
+      setAsidePortalContainer(asideRef.current);
+    } else {
+      setAsidePortalContainer(null);
+    }
+  }, [chatView]);
+
+  const handleOpenChat = () => setChatView("dialog");
+  const handleCloseChat = () => setChatView("affix");
+  const handleExpand = () => setChatView("expanded");
+  const handleMoveToAside = () => setChatView("aside");
+  const handleMinimize = () => setChatView("dialog");
 
   const handleExplainClick = () => {
     const selection = window.getSelection();
     const text = selection?.toString().trim() || "";
     if (text) {
-      openChat();
       setTextToExplain(text);
+      setChatView("dialog");
       if (selection) {
         selection.removeAllRanges();
       }
@@ -39,6 +52,18 @@ function App() {
   };
 
   const showButton = rects.length > 0;
+
+  const chatPanel = (
+    <ChatPanel
+      expanded={chatView === "expanded"}
+      onExpand={handleExpand}
+      onMinimize={handleMinimize}
+      onMoveToAside={handleMoveToAside}
+      onClose={handleCloseChat}
+      referencedText={textToExplain}
+      onResetReferencedText={() => setTextToExplain(null)}
+    />
+  );
 
   return (
     <ChatProvider>
@@ -49,7 +74,7 @@ function App() {
         aside={{
           width: { sm: 200, md: 300, lg: 400, xl: 500 },
           breakpoint: "sm",
-          collapsed: { mobile: !opened, desktop: !asideChat },
+          collapsed: { mobile: true, desktop: chatView !== "aside" },
         }}
       >
         <AppShell.Header>
@@ -62,7 +87,7 @@ function App() {
 
         <AppShell.Main style={{ overflow: "hidden" }}>
           <Container size="responsive">
-            {!(expanded && chatOpened) && <Text>{fullText}</Text>}
+            {chatView !== "expanded" && <Text>{fullText}</Text>}
 
             {endpoint && showButton && (
               <Portal>
@@ -87,64 +112,37 @@ function App() {
               </Portal>
             )}
 
-            {expanded && chatOpened && (
+            {chatView === "expanded" && (
               <Box style={{ height: "calc(100vh - 100px)" }}>
-                <ChatPanel
-                  expanded
-                  onMinimize={() => setExpanded(false)}
-                  onMoveToAside={() => {
-                    setAsideChat(true);
-                    setExpanded(false);
-                  }}
-                  onClose={handleClose}
-                  referencedText={textToExplain}
-                  onResetReferencedText={() => setTextToExplain(null)}
-                />
+                {chatPanel}
               </Box>
             )}
 
-            {!chatOpened && (
+            {chatView === "affix" && (
               <Affix position={{ bottom: 20, right: 20 }}>
-                <ActionIcon variant="filled" aria-label="Chat" size="xl" radius="xl" onClick={openChat}>
+                <ActionIcon variant="filled" aria-label="Chat" size="xl" radius="xl" onClick={handleOpenChat}>
                   <IconMessageCircle />
                 </ActionIcon>
               </Affix>
             )}
-
-            <Dialog
-              withBorder
-              opened={chatOpened && !expanded && !asideChat}
-              onClose={handleClose}
-              size="lg"
-              radius="md"
-              p="xs"
-            >
-              <Box style={{ height: "calc(50vh - 20px)" }}>
-                <ChatPanel
-                  onExpand={() => setExpanded(true)}
-                  onMoveToAside={() => setAsideChat(true)}
-                  onClose={handleClose}
-                  referencedText={textToExplain}
-                  onResetReferencedText={() => setTextToExplain(null)}
-                />
-              </Box>
-            </Dialog>
           </Container>
         </AppShell.Main>
-        <AppShell.Aside p="xs">
-          {asideChat && (
-            <ChatPanel
-              onExpand={() => {
-                setAsideChat(false);
-                setExpanded(true);
-              }}
-              onClose={handleClose}
-              referencedText={textToExplain}
-              onResetReferencedText={() => setTextToExplain(null)}
-            />
-          )}
+        <AppShell.Aside p="xs" ref={asideRef}>
+          {asidePortalContainer && chatView === "aside" && createPortal(chatPanel, asidePortalContainer)}
         </AppShell.Aside>
       </AppShell>
+
+      <Dialog
+        opened={chatView === "dialog"}
+        onClose={handleCloseChat}
+        size="lg"
+        radius="md"
+        p="xs"
+      >
+        <Box style={{ height: "calc(50vh - 20px)" }}>
+          {chatPanel}
+        </Box>
+      </Dialog>
     </ChatProvider>
   );
 }
