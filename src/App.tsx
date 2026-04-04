@@ -19,7 +19,8 @@ function App() {
   const [opened, { toggle }] = useDisclosure();
   const [chatView, setChatView] = useState<ChatView>("affix");
   const [textToExplain, setTextToExplain] = useState<string | null>(null);
-  const rects = useSelectionRects({ ignoreSelector: "button" });
+  const textElementRef = useRef<HTMLDivElement>(null);
+  const rects = useSelectionRects({ ignoreSelector: "button", containerRef: textElementRef });
   const endpoint = useSelectionEndPoint(rects);
 
   const asideRef = useRef<HTMLDivElement>(null);
@@ -87,7 +88,7 @@ function App() {
 
         <AppShell.Main style={{ overflow: "hidden" }}>
           <Container size="responsive">
-            {chatView !== "expanded" && <Text>{fullText}</Text>}
+            {chatView !== "expanded" && <Text ref={textElementRef}>{fullText}</Text>}
 
             {endpoint && showButton && (
               <Portal>

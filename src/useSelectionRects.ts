@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 
 type UseSelectionRectsOptions = {
   ignoreSelector?: string;
+  containerRef?: React.RefObject<HTMLElement | null>;
 };
 
 export function useSelectionRects(options: UseSelectionRectsOptions = {}) {
@@ -12,6 +13,14 @@ export function useSelectionRects(options: UseSelectionRectsOptions = {}) {
       setTimeout(() => {
         const selection = window.getSelection();
         if (selection && !selection.isCollapsed) {
+          if (options.containerRef?.current) {
+            const { anchorNode, focusNode } = selection;
+            const container = options.containerRef.current;
+            if (!container.contains(anchorNode) || !container.contains(focusNode)) {
+              setRects([]);
+              return;
+            }
+          }
           const range = selection.getRangeAt(0);
           const clientRects = range.getClientRects();
           setRects(Array.from(clientRects));
@@ -35,7 +44,7 @@ export function useSelectionRects(options: UseSelectionRectsOptions = {}) {
       document.removeEventListener("mouseup", handleMouseUp);
       document.removeEventListener("mousedown", handleMouseDown);
     };
-  }, [options.ignoreSelector]);
+  }, [options.ignoreSelector, options.containerRef]);
 
   return rects;
 }
