@@ -6,26 +6,30 @@ import {
 } from "@tabler/icons-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { useMessages, type Message } from "./context/MessagesContext";
+import { useMessages, type Message } from "./store/chatStore";
 import { ChatInput } from "./components/ChatInput";
 import { MessageBubble } from "./components/MessageBubble";
 
+type ChatView = "affix" | "dialog" | "expanded" | "aside";
+
 interface ChatPanelProps {
-  expanded?: boolean;
+  viewMode?: ChatView;
   onExpand?: () => void;
   onMinimize?: () => void;
   onClose?: () => void;
   onMoveToAside?: () => void;
+  onMoveToDialog?: () => void;
   referencedText?: string | null;
   onResetReferencedText?: () => void;
 }
 
 export function ChatPanel({
-  expanded,
+  viewMode,
   onExpand,
   onMinimize,
   onClose,
   onMoveToAside,
+  onMoveToDialog,
   referencedText,
   onResetReferencedText,
 }: ChatPanelProps) {
@@ -175,16 +179,25 @@ export function ChatPanel({
         <Text fw={500} mr="auto">
           Chat with AI
         </Text>
-        {expanded ? (
+        {viewMode === "expanded" ? (
           <ActionIcon variant="subtle" color="gray" onClick={onMinimize}>
             <IconMinimize size={20} />
           </ActionIcon>
+        ) : viewMode === "aside" ? (
+          <>
+            <ActionIcon variant="subtle" color="gray" onClick={onExpand}>
+              <IconMaximize size={20} />
+            </ActionIcon>
+            <ActionIcon variant="subtle" color="gray" onClick={onMoveToDialog}>
+              <IconMinimize size={20} />
+            </ActionIcon>
+          </>
         ) : (
           <ActionIcon variant="subtle" color="gray" onClick={onExpand}>
             <IconMaximize size={20} />
           </ActionIcon>
         )}
-        {onMoveToAside && (
+        {viewMode !== "aside" && onMoveToAside && (
           <ActionIcon variant="subtle" color="gray" onClick={onMoveToAside}>
             <IconLayoutSidebarRight size={20} />
           </ActionIcon>

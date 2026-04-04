@@ -1,7 +1,7 @@
 import { ActionIcon, Box, CloseButton, Group, Paper, Stack, Text, Textarea } from "@mantine/core";
 import { IconQuote, IconSend } from "@tabler/icons-react";
-import { useRef } from "react";
-import { useInput } from "../context/InputContext";
+import { useEffect, useRef } from "react";
+import { useInput } from "../store/chatStore";
 
 interface ChatInputProps {
   referencedText?: string | null;
@@ -10,8 +10,15 @@ interface ChatInputProps {
 }
 
 export function ChatInput({ referencedText, onResetReferencedText, onSend }: ChatInputProps) {
-  const { input, setInput, setCursorPos } = useInput();
+  const { input, setInput, cursorPos, setCursorPos } = useInput();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (textareaRef.current && cursorPos !== null) {
+      textareaRef.current.selectionStart = cursorPos;
+      textareaRef.current.selectionEnd = cursorPos;
+    }
+  }, [cursorPos]);
 
   return (
     <Paper shadow="xs" radius="md">

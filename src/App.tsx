@@ -5,7 +5,6 @@ import { useRef, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "wouter";
 import { ChatPanel } from "./ChatPanel";
-import { ChatProvider } from "./context/ChatProvider";
 import { IconMessageCircle, IconQuote } from "@tabler/icons-react";
 import { useSelectionRects } from "./useSelectionRects";
 import { useSelectionEndPoint } from "./useSelectionEndPoint";
@@ -56,10 +55,11 @@ function App() {
 
   const chatPanel = (
     <ChatPanel
-      expanded={chatView === "expanded"}
+      viewMode={chatView}
       onExpand={handleExpand}
       onMinimize={handleMinimize}
       onMoveToAside={handleMoveToAside}
+      onMoveToDialog={handleMinimize}
       onClose={handleCloseChat}
       referencedText={textToExplain}
       onResetReferencedText={() => setTextToExplain(null)}
@@ -67,7 +67,7 @@ function App() {
   );
 
   return (
-    <ChatProvider>
+    <>
       <AppShell
         padding="md"
         header={{ height: 60 }}
@@ -144,7 +144,7 @@ function App() {
           {chatPanel}
         </Box>
       </Dialog>
-    </ChatProvider>
+    </>
   );
 }
 

@@ -24,7 +24,7 @@ import {
 import { memo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { Message } from "../context/MessagesContext";
+import type { Message } from "../store/chatStore";
 
 interface MessageBubbleProps {
   message: Message;
