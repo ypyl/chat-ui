@@ -10,15 +10,15 @@ interface ChatInputProps {
 }
 
 export function ChatInput({ referencedText, onResetReferencedText, onSend }: ChatInputProps) {
-  const { input, setInput, cursorPos, setCursorPos } = useInput();
+  const { input, setInput, selectionStart, selectionEnd, setSelectionRange } = useInput();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (textareaRef.current && cursorPos !== null) {
-      textareaRef.current.selectionStart = cursorPos;
-      textareaRef.current.selectionEnd = cursorPos;
+    if (textareaRef.current && selectionStart !== null && selectionEnd !== null) {
+      textareaRef.current.selectionStart = selectionStart;
+      textareaRef.current.selectionEnd = selectionEnd;
     }
-  }, [cursorPos]);
+  }, [selectionStart, selectionEnd]);
 
   return (
     <Paper shadow="xs" radius="md">
@@ -58,7 +58,7 @@ export function ChatInput({ referencedText, onResetReferencedText, onSend }: Cha
               maxRows={4}
               value={input}
               onChange={(e) => setInput(e.currentTarget.value)}
-              onSelect={(e) => setCursorPos(e.currentTarget.selectionStart)}
+              onSelect={(e) => setSelectionRange(e.currentTarget.selectionStart, e.currentTarget.selectionEnd)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();

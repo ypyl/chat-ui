@@ -7,8 +7,9 @@ interface ChatStore {
   setMessages: (messages: Message[] | ((prev: Message[]) => Message[])) => void;
   input: string;
   setInput: (input: string) => void;
-  cursorPos: number | null;
-  setCursorPos: (pos: number | null) => void;
+  selectionStart: number | null;
+  selectionEnd: number | null;
+  setSelectionRange: (start: number | null, end: number | null) => void;
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
@@ -19,8 +20,9 @@ export const useChatStore = create<ChatStore>((set) => ({
     })),
   input: "",
   setInput: (input) => set({ input }),
-  cursorPos: null,
-  setCursorPos: (cursorPos) => set({ cursorPos }),
+  selectionStart: null,
+  selectionEnd: null,
+  setSelectionRange: (selectionStart, selectionEnd) => set({ selectionStart, selectionEnd }),
 }));
 
 export const useMessages = () => {
@@ -32,9 +34,10 @@ export const useMessages = () => {
 export const useInput = () => {
   const input = useChatStore((state) => state.input);
   const setInput = useChatStore((state) => state.setInput);
-  const cursorPos = useChatStore((state) => state.cursorPos);
-  const setCursorPos = useChatStore((state) => state.setCursorPos);
-  return { input, setInput, cursorPos, setCursorPos };
+  const selectionStart = useChatStore((state) => state.selectionStart);
+  const selectionEnd = useChatStore((state) => state.selectionEnd);
+  const setSelectionRange = useChatStore((state) => state.setSelectionRange);
+  return { input, setInput, selectionStart, selectionEnd, setSelectionRange };
 };
 
 export const useChat = () => useChatStore();
