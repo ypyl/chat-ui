@@ -37,6 +37,7 @@ export function ChatPanel({
   const viewport = useRef<HTMLDivElement>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
   const lastTurnRef = useRef<HTMLDivElement>(null);
+  const turnRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -63,14 +64,24 @@ export function ChatPanel({
       return updated;
     }), [setMessages]);
 
-  const regenerateAgentMessage = useCallback(async (index: number) => {
-    const messageList = messages.filter((m) => !m.deleted);
+  const regenerateAgentMessage = useCallback(async (turnIndex: number) => {
+    const messageList: Message[] = [];
+    let turnCount = 0;
+    for (const msg of messages) {
+      if (msg.deleted) continue;
+      messageList.push(msg);
+      if (msg.role === "user") {
+        if (turnCount === turnIndex) break;
+        turnCount++;
+      }
+    }
     setIsLoading(true);
 
     let fullResponse = "";
 
     setTimeout(() => {
-      lastTurnRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+      const ref = turnRefs.current.get(turnIndex);
+      ref?.scrollIntoView({ block: "start", behavior: "smooth" });
     }, 0);
 
     try {
@@ -83,7 +94,7 @@ export function ChatPanel({
             fullResponse += ev.data;
             setMessages((prev) => {
               const updated = [...prev];
-              updated[index] = { role: "agent", text: fullResponse };
+              updated[turnIndex * 2 + 1] = { role: "agent", text: fullResponse };
               return updated;
             });
           }
@@ -94,7 +105,7 @@ export function ChatPanel({
         onerror() {
           setMessages((prev) => {
             const updated = [...prev];
-            updated[index] = { role: "agent", text: "Failed to get response. Please try again.", isError: true };
+            updated[turnIndex * 2 + 1] = { role: "agent", text: "Failed to get response. Please try again.", isError: true };
             return updated;
           });
           setIsLoading(false);
@@ -103,7 +114,7 @@ export function ChatPanel({
     } catch {
       setMessages((prev) => {
         const updated = [...prev];
-        updated[index] = { role: "agent", text: "Failed to get response. Please try again.", isError: true };
+        updated[turnIndex * 2 + 1] = { role: "agent", text: "Failed to get response. Please try again.", isError: true };
         return updated;
       });
       setIsLoading(false);
@@ -212,7 +223,9 @@ export function ChatPanel({
             return (
               <Stack
                 key={i}
-                ref={isLast ? lastTurnRef : undefined}
+                ref={(el) => {
+                  if (el) turnRefs.current.set(i, el);
+                }}
                 gap="xs"
                 style={{
                   minHeight: isLast ? viewportHeight || "100%" : undefined,
@@ -237,7 +250,7 @@ export function ChatPanel({
                         index={j}
                         onSaveEdit={saveEdit}
                         onDeleteTurn={deleteTurn}
-                        onRegenerate={regenerateAgentMessage}
+                        onRegenerate={() => regenerateAgentMessage(i)}
                       />
                     </Stack>
                   ))
