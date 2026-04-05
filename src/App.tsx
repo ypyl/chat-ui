@@ -44,7 +44,6 @@ function App() {
     const text = selection?.toString().trim() || "";
     if (text) {
       setTextToExplain(text);
-      setChatView("dialog");
       if (selection) {
         selection.removeAllRanges();
       }
