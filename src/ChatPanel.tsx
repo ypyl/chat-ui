@@ -1,4 +1,4 @@
-import { ActionIcon, CloseButton, Group, ScrollArea, Skeleton, Stack, Text } from "@mantine/core";
+import { ActionIcon, Button, CloseButton, Group, ScrollArea, Skeleton, Stack, Text } from "@mantine/core";
 import { IconMaximize, IconMinimize, IconLayoutSidebarRight } from "@tabler/icons-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
@@ -77,10 +77,30 @@ export function ChatPanel({
     [setTurns],
   );
 
+  const undoTurn = useCallback(
+    (turnIndex: number) => {
+      setTurns((prev) => {
+        const updated = [...prev];
+        updated[turnIndex] = {
+          ...updated[turnIndex],
+          user: { ...updated[turnIndex].user, deleted: false },
+          agent: updated[turnIndex].agent ? { ...updated[turnIndex].agent, deleted: false } : null,
+        };
+        return updated;
+      });
+    },
+    [setTurns],
+  );
+
   const regenerateAgentMessage = useCallback(
     async (turnIndex: number) => {
       const messagesToSend = turnsToMessages(turns.slice(0, turnIndex)).concat(turns[turnIndex].user);
 
+      setTurns((prev) => {
+        const updated = [...prev];
+        updated[turnIndex] = { ...updated[turnIndex], agent: null };
+        return updated;
+      });
       setIsLoading(true);
       let fullResponse = "";
 
@@ -248,9 +268,9 @@ export function ChatPanel({
                 }}
               >
                 {turn.user.deleted ? (
-                  <Text c="dimmed" size="sm" fs="italic">
-                    Messages deleted
-                  </Text>
+                  <Button variant="transparent" size="xs" p={4} onClick={() => undoTurn(i)}>
+                    Restore deleted messages
+                  </Button>
                 ) : (
                   <>
                     <Stack gap={2} align="flex-end" className="chat-message">
@@ -262,7 +282,7 @@ export function ChatPanel({
                     </Stack>
                     <Stack gap={2} align="flex-start" className="chat-message">
                       {turn.agent === null ? (
-                        <Skeleton height={40} />
+                        <Skeleton height={48} />
                       ) : (
                         <MessageBubble
                           message={turn.agent}
