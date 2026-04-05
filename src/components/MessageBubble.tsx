@@ -22,10 +22,9 @@ import type { Message } from "../store/chatStore";
 
 interface MessageBubbleProps {
   message: Message;
-  index: number;
-  onSaveEdit: (index: number, text: string) => void;
-  onDeleteTurn: (indexes: number[]) => void;
-  onRegenerate: (index: number) => void;
+  onSaveEdit: (text: string) => void;
+  onDeleteTurn: () => void;
+  onRegenerate?: () => void;
 }
 
 const markdownComponents = {
@@ -87,27 +86,26 @@ const MarkdownContent = memo(function MarkdownContent({ text }: { text: string }
 
 export const MessageBubble = memo(function MessageBubble({
   message,
-  index,
   onSaveEdit,
   onDeleteTurn,
   onRegenerate,
 }: MessageBubbleProps) {
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState("");
 
-  const handleStartEdit = (msgIndex: number, text: string) => {
-    setEditingIndex(msgIndex);
+  const handleStartEdit = (text: string) => {
+    setIsEditing(true);
     setEditText(text);
   };
 
-  const handleSaveEdit = (msgIndex: number) => {
+  const handleSaveEdit = () => {
     if (!editText.trim()) return;
-    onSaveEdit(msgIndex, editText);
-    setEditingIndex(null);
+    onSaveEdit(editText);
+    setIsEditing(false);
   };
 
   const renderContent = () => {
-    if (editingIndex === index) {
+    if (isEditing) {
       return (
         <Textarea
           autoFocus
@@ -120,9 +118,9 @@ export const MessageBubble = memo(function MessageBubble({
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              handleSaveEdit(index);
+              handleSaveEdit();
             }
-            if (e.key === "Escape") setEditingIndex(null);
+            if (e.key === "Escape") setIsEditing(false);
           }}
         />
       );
@@ -137,7 +135,7 @@ export const MessageBubble = memo(function MessageBubble({
     }
 
     if (message.role === "agent") {
-      return message.text.trim() === "" ? <Skeleton height="22" /> : <MarkdownContent text={message.text} />;
+      return <MarkdownContent text={message.text} />;
     }
 
     return (
@@ -164,27 +162,27 @@ export const MessageBubble = memo(function MessageBubble({
             )}
           </CopyButton>
         )}
-        {message.role === "agent" && (
-          <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => onRegenerate(index)}>
+        {message.role === "agent" && onRegenerate && (
+          <ActionIcon size="xs" variant="subtle" color="gray" onClick={onRegenerate}>
             <IconRefresh size={12} />
           </ActionIcon>
         )}
-        {message.role === "user" && editingIndex !== index && (
-          <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => handleStartEdit(index, message.text)}>
+        {message.role === "user" && !isEditing && (
+          <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => handleStartEdit(message.text)}>
             <IconEdit size={12} />
           </ActionIcon>
         )}
-        {message.role === "user" && editingIndex === index && (
+        {message.role === "user" && isEditing && (
           <Group gap="xs">
-            <ActionIcon size="xs" variant="subtle" color="green" onClick={() => handleSaveEdit(index)}>
+            <ActionIcon size="xs" variant="subtle" color="green" onClick={handleSaveEdit}>
               <IconCheck size={12} />
             </ActionIcon>
-            <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setEditingIndex(null)}>
+            <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setIsEditing(false)}>
               <IconX size={12} />
             </ActionIcon>
           </Group>
         )}
-        <ActionIcon size="xs" variant="subtle" color="red" onClick={() => onDeleteTurn([index])}>
+        <ActionIcon size="xs" variant="subtle" color="red" onClick={onDeleteTurn}>
           <IconTrash size={12} />
         </ActionIcon>
       </Group>

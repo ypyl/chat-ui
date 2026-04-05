@@ -1,12 +1,8 @@
-import { ActionIcon, CloseButton, Group, ScrollArea, Stack, Text } from "@mantine/core";
-import {
-  IconMaximize,
-  IconMinimize,
-  IconLayoutSidebarRight,
-} from "@tabler/icons-react";
+import { ActionIcon, CloseButton, Group, ScrollArea, Skeleton, Stack, Text } from "@mantine/core";
+import { IconMaximize, IconMinimize, IconLayoutSidebarRight } from "@tabler/icons-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { useMessages, type Message } from "./store/chatStore";
+import { useMessages, turnsToMessages, type Turn } from "./store/chatStore";
 import { ChatInput } from "./components/ChatInput";
 import { MessageBubble } from "./components/MessageBubble";
 
@@ -33,156 +29,172 @@ export function ChatPanel({
   referencedText,
   onResetReferencedText,
 }: ChatPanelProps) {
-  const { messages, setMessages } = useMessages();
+  const { turns, setTurns } = useMessages();
   const viewport = useRef<HTMLDivElement>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
-  const lastTurnRef = useRef<HTMLDivElement>(null);
   const turnRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (viewport.current) setViewportHeight(viewport.current.clientHeight);
     setTimeout(() => {
-      lastTurnRef.current?.scrollIntoView({ block: "start" });
+      turnRefs.current.get(turns.length - 1)?.scrollIntoView({ block: "start" });
     }, 0);
-  }, []);
+  }, [turns.length]);
 
-  const saveEdit = useCallback((index: number, text: string) => {
-    setMessages((prev) => {
-      const updated = [...prev];
-      updated[index] = { role: "user", text };
-      return updated;
-    });
-  }, [setMessages]);
-
-  const deleteTurn = useCallback((indexes: number[]) =>
-    setMessages((prev) => {
-      const updated = [...prev];
-      indexes.forEach((idx) => {
-        updated[idx] = { ...updated[idx], deleted: true };
+  const saveEdit = useCallback(
+    (turnIndex: number, role: "user" | "agent", text: string) => {
+      setTurns((prev) => {
+        const updated = [...prev];
+        if (role === "user") {
+          updated[turnIndex] = { ...updated[turnIndex], user: { ...updated[turnIndex].user, text } };
+        } else {
+          updated[turnIndex] = {
+            ...updated[turnIndex],
+            agent: updated[turnIndex].agent ? { ...updated[turnIndex].agent!, text } : null,
+          };
+        }
+        return updated;
       });
-      return updated;
-    }), [setMessages]);
+    },
+    [setTurns],
+  );
 
-  const regenerateAgentMessage = useCallback(async (turnIndex: number) => {
-    const messageList: Message[] = [];
-    let turnCount = 0;
-    for (const msg of messages) {
-      if (msg.deleted) continue;
-      messageList.push(msg);
-      if (msg.role === "user") {
-        if (turnCount === turnIndex) break;
-        turnCount++;
+  const deleteTurn = useCallback(
+    (turnIndexes: number[]) => {
+      setTurns((prev) => {
+        const updated = [...prev];
+        turnIndexes.forEach((idx) => {
+          updated[idx] = {
+            ...updated[idx],
+            user: { ...updated[idx].user, deleted: true },
+            agent: updated[idx].agent ? { ...updated[idx].agent, deleted: true } : null,
+          };
+        });
+        return updated;
+      });
+    },
+    [setTurns],
+  );
+
+  const regenerateAgentMessage = useCallback(
+    async (turnIndex: number) => {
+      const messagesToSend = turnsToMessages(turns.slice(0, turnIndex)).concat(turns[turnIndex].user);
+
+      setIsLoading(true);
+      let fullResponse = "";
+
+      setTimeout(() => {
+        turnRefs.current.get(turnIndex)?.scrollIntoView({ block: "start", behavior: "smooth" });
+      }, 0);
+
+      try {
+        await fetchEventSource("/chat/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(messagesToSend),
+          onmessage(ev) {
+            if (ev.data) {
+              fullResponse += ev.data;
+              setTurns((prev) => {
+                const updated = [...prev];
+                updated[turnIndex] = { ...updated[turnIndex], agent: { role: "agent", text: fullResponse } };
+                return updated;
+              });
+            }
+          },
+          onclose() {
+            setIsLoading(false);
+          },
+          onerror() {
+            setTurns((prev) => {
+              const updated = [...prev];
+              updated[turnIndex] = {
+                ...updated[turnIndex],
+                agent: { role: "agent", text: "Failed to get response. Please try again.", isError: true },
+              };
+              return updated;
+            });
+            setIsLoading(false);
+          },
+        });
+      } catch {
+        setTurns((prev) => {
+          const updated = [...prev];
+          updated[turnIndex] = {
+            ...updated[turnIndex],
+            agent: { role: "agent", text: "Failed to get response. Please try again.", isError: true },
+          };
+          return updated;
+        });
+        setIsLoading(false);
       }
-    }
-    setIsLoading(true);
+    },
+    [turns, setTurns],
+  );
 
-    let fullResponse = "";
+  const sendMessage = useCallback(
+    async (input: string, setInput: (v: string) => void) => {
+      if (!input.trim() || isLoading) return;
 
-    setTimeout(() => {
-      const ref = turnRefs.current.get(turnIndex);
-      ref?.scrollIntoView({ block: "start", behavior: "smooth" });
-    }, 0);
+      const newTurn: Turn = { user: { role: "user", text: input }, agent: null };
+      const newTurnIndex = turns.length;
 
-    try {
-      await fetchEventSource("/chat/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(messageList),
-        onmessage(ev) {
-          if (ev.data) {
-            fullResponse += ev.data;
-            setMessages((prev) => {
+      setTurns((prev) => [...prev, newTurn]);
+      setInput("");
+      setIsLoading(true);
+
+      const allMessages = turnsToMessages([...turns, newTurn]);
+      let fullResponse = "";
+
+      setTimeout(() => {
+        turnRefs.current.get(newTurnIndex)?.scrollIntoView({ block: "start", behavior: "smooth" });
+      }, 0);
+
+      try {
+        await fetchEventSource("/chat/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(allMessages),
+          onmessage(ev) {
+            if (ev.data) {
+              fullResponse += ev.data;
+              setTurns((prev) => {
+                const updated = [...prev];
+                updated[newTurnIndex] = { ...updated[newTurnIndex], agent: { role: "agent", text: fullResponse } };
+                return updated;
+              });
+            }
+          },
+          onclose() {
+            setIsLoading(false);
+          },
+          onerror() {
+            setTurns((prev) => {
               const updated = [...prev];
-              updated[turnIndex * 2 + 1] = { role: "agent", text: fullResponse };
+              updated[newTurnIndex] = {
+                ...updated[newTurnIndex],
+                agent: { role: "agent", text: "Failed to get response. Please try again.", isError: true },
+              };
               return updated;
             });
-          }
-        },
-        onclose() {
-          setIsLoading(false);
-        },
-        onerror() {
-          setMessages((prev) => {
-            const updated = [...prev];
-            updated[turnIndex * 2 + 1] = { role: "agent", text: "Failed to get response. Please try again.", isError: true };
-            return updated;
-          });
-          setIsLoading(false);
-        },
-      });
-    } catch {
-      setMessages((prev) => {
-        const updated = [...prev];
-        updated[turnIndex * 2 + 1] = { role: "agent", text: "Failed to get response. Please try again.", isError: true };
-        return updated;
-      });
-      setIsLoading(false);
-    }
-  }, [messages, setMessages]);
-
-  const sendMessage = useCallback(async (input: string, setInput: (v: string) => void) => {
-    if (!input.trim() || isLoading) return;
-    const userMessage = { role: "user" as const, text: input };
-    const agentMessageId = messages.length + 1;
-    setMessages((prev) => [...prev, userMessage, { role: "agent", text: "" }]);
-    setInput("");
-    setIsLoading(true);
-
-    const allMessages = [...messages, userMessage];
-    let fullResponse = "";
-
-    setTimeout(() => {
-      lastTurnRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
-    }, 0);
-
-    try {
-      await fetchEventSource("/chat/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(allMessages),
-        onmessage(ev) {
-          if (ev.data) {
-            fullResponse += ev.data;
-            setMessages((prev) => {
-              const updated = [...prev];
-              updated[agentMessageId] = { role: "agent", text: fullResponse };
-              return updated;
-            });
-          }
-        },
-        onclose() {
-          setIsLoading(false);
-        },
-        onerror() {
-          setMessages((prev) => {
-            const updated = [...prev];
-            updated[agentMessageId] = {
-              role: "agent",
-              text: "Failed to get response. Please try again.",
-              isError: true,
-            };
-            return updated;
-          });
-          setIsLoading(false);
-        },
-      });
-    } catch {
-      setMessages((prev) => {
-        const updated = [...prev];
-        updated[agentMessageId] = { role: "agent", text: "Failed to get response. Please try again.", isError: true };
-        return updated;
-      });
-      setIsLoading(false);
-    }
-  }, [messages, setMessages, isLoading]);
-
-  const turns = messages.reduce<Message[][]>((acc, m) => {
-    if (m.role === "user") acc.push([m]);
-    else if (acc.length > 0) acc[acc.length - 1].push(m);
-    else acc.push([m]);
-    return acc;
-  }, []);
+            setIsLoading(false);
+          },
+        });
+      } catch {
+        setTurns((prev) => {
+          const updated = [...prev];
+          updated[newTurnIndex] = {
+            ...updated[newTurnIndex],
+            agent: { role: "agent", text: "Failed to get response. Please try again.", isError: true },
+          };
+          return updated;
+        });
+        setIsLoading(false);
+      }
+    },
+    [turns, isLoading, setTurns],
+  );
 
   return (
     <Stack gap="xs" style={{ height: "100%" }}>
@@ -224,7 +236,9 @@ export function ChatPanel({
               <Stack
                 key={i}
                 ref={(el) => {
-                  if (el) turnRefs.current.set(i, el);
+                  if (el) {
+                    turnRefs.current.set(i, el);
+                  }
                 }}
                 gap="xs"
                 style={{
@@ -233,27 +247,32 @@ export function ChatPanel({
                   paddingTop: "var(--mantine-spacing-xs)",
                 }}
               >
-                {turn[0]?.deleted ? (
+                {turn.user.deleted ? (
                   <Text c="dimmed" size="sm" fs="italic">
                     Messages deleted
                   </Text>
                 ) : (
-                  turn.map((m, j) => (
-                    <Stack
-                      key={j}
-                      gap={2}
-                      align={m.role === "user" ? "flex-end" : "flex-start"}
-                      className="chat-message"
-                    >
+                  <>
+                    <Stack gap={2} align="flex-end" className="chat-message">
                       <MessageBubble
-                        message={m}
-                        index={j}
-                        onSaveEdit={saveEdit}
-                        onDeleteTurn={deleteTurn}
-                        onRegenerate={() => regenerateAgentMessage(i)}
+                        message={turn.user}
+                        onSaveEdit={(text) => saveEdit(i, "user", text)}
+                        onDeleteTurn={() => deleteTurn([i])}
                       />
                     </Stack>
-                  ))
+                    <Stack gap={2} align="flex-start" className="chat-message">
+                      {turn.agent === null ? (
+                        <Skeleton height={40} />
+                      ) : (
+                        <MessageBubble
+                          message={turn.agent}
+                          onSaveEdit={(text) => saveEdit(i, "agent", text)}
+                          onDeleteTurn={() => deleteTurn([i])}
+                          onRegenerate={() => regenerateAgentMessage(i)}
+                        />
+                      )}
+                    </Stack>
+                  </>
                 )}
               </Stack>
             );
@@ -261,11 +280,7 @@ export function ChatPanel({
         </Stack>
       </ScrollArea>
 
-      <ChatInput
-        referencedText={referencedText}
-        onResetReferencedText={onResetReferencedText}
-        onSend={sendMessage}
-      />
+      <ChatInput referencedText={referencedText} onResetReferencedText={onResetReferencedText} onSend={sendMessage} />
     </Stack>
   );
 }

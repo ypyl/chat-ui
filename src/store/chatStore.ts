@@ -2,9 +2,18 @@ import { create } from "zustand";
 
 export type Message = { role: "user" | "agent"; text: string; deleted?: boolean; isError?: boolean };
 
+export type Turn = {
+  user: Message;
+  agent: Message | null;
+};
+
+export function turnsToMessages(turns: Turn[]): Message[] {
+  return turns.flatMap(turn => [turn.user, turn.agent].filter(Boolean) as Message[]);
+}
+
 interface ChatStore {
-  messages: Message[];
-  setMessages: (messages: Message[] | ((prev: Message[]) => Message[])) => void;
+  turns: Turn[];
+  setTurns: (turns: Turn[] | ((prev: Turn[]) => Turn[])) => void;
   input: string;
   setInput: (input: string) => void;
   selectionStart: number | null;
@@ -13,10 +22,10 @@ interface ChatStore {
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
-  messages: [],
-  setMessages: (messagesOrUpdater) =>
+  turns: [],
+  setTurns: (turnsOrUpdater) =>
     set((state) => ({
-      messages: typeof messagesOrUpdater === "function" ? messagesOrUpdater(state.messages) : messagesOrUpdater,
+      turns: typeof turnsOrUpdater === "function" ? turnsOrUpdater(state.turns) : turnsOrUpdater,
     })),
   input: "",
   setInput: (input) => set({ input }),
@@ -26,9 +35,9 @@ export const useChatStore = create<ChatStore>((set) => ({
 }));
 
 export const useMessages = () => {
-  const messages = useChatStore((state) => state.messages);
-  const setMessages = useChatStore((state) => state.setMessages);
-  return { messages, setMessages };
+  const turns = useChatStore((state) => state.turns);
+  const setTurns = useChatStore((state) => state.setTurns);
+  return { turns, setTurns };
 };
 
 export const useInput = () => {
