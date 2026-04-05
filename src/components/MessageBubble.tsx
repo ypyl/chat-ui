@@ -6,6 +6,7 @@ import {
   Divider,
   Group,
   Paper,
+  Skeleton,
   Stack,
   Table,
   Text,
@@ -13,14 +14,7 @@ import {
   Title,
   Tooltip,
 } from "@mantine/core";
-import {
-  IconCheck,
-  IconCopy,
-  IconEdit,
-  IconRefresh,
-  IconTrash,
-  IconX,
-} from "@tabler/icons-react";
+import { IconCheck, IconCopy, IconEdit, IconRefresh, IconTrash, IconX } from "@tabler/icons-react";
 import { memo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -143,7 +137,7 @@ export const MessageBubble = memo(function MessageBubble({
     }
 
     if (message.role === "agent") {
-      return <MarkdownContent text={message.text} />;
+      return message.text.trim() === "" ? <Skeleton height="22" /> : <MarkdownContent text={message.text} />;
     }
 
     return (
@@ -158,20 +152,12 @@ export const MessageBubble = memo(function MessageBubble({
   return (
     <Stack gap="xs">
       {renderContent()}
-      <Group
-        gap="xs"
-        justify={message.role === "user" ? "flex-end" : undefined}
-      >
+      <Group gap="xs" justify={message.role === "user" ? "flex-end" : undefined}>
         {message.role === "agent" && (
           <CopyButton value={message.text} timeout={2000}>
             {({ copied, copy }) => (
               <Tooltip label={copied ? "Copied" : "Copy"} withArrow position="right">
-                <ActionIcon
-                  size="xs"
-                  color={copied ? "teal" : "gray"}
-                  variant="subtle"
-                  onClick={copy}
-                >
+                <ActionIcon size="xs" color={copied ? "teal" : "gray"} variant="subtle" onClick={copy}>
                   {copied ? <IconCheck size={12} /> : <IconCopy size={12} />}
                 </ActionIcon>
               </Tooltip>
@@ -179,22 +165,12 @@ export const MessageBubble = memo(function MessageBubble({
           </CopyButton>
         )}
         {message.role === "agent" && (
-          <ActionIcon
-            size="xs"
-            variant="subtle"
-            color="gray"
-            onClick={() => onRegenerate(index)}
-          >
+          <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => onRegenerate(index)}>
             <IconRefresh size={12} />
           </ActionIcon>
         )}
         {message.role === "user" && editingIndex !== index && (
-          <ActionIcon
-            size="xs"
-            variant="subtle"
-            color="gray"
-            onClick={() => handleStartEdit(index, message.text)}
-          >
+          <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => handleStartEdit(index, message.text)}>
             <IconEdit size={12} />
           </ActionIcon>
         )}

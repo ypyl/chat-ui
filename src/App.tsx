@@ -1,4 +1,4 @@
-import { ActionIcon, Affix, AppShell, Box, Burger, Dialog, Text, Container, Portal } from "@mantine/core";
+import { ActionIcon, Affix, AppShell, Box, Burger, Dialog, Text, Portal, Container } from "@mantine/core";
 import "@mantine/core/styles.css";
 import { useDisclosure } from "@mantine/hooks";
 import { useRef, useEffect, useState } from "react";
@@ -116,9 +116,9 @@ function App() {
             )}
 
             {chatView === "expanded" && (
-              <Box style={{ height: "calc(100vh - 100px)" }}>
+              <Container style={{ height: "calc(100vh - 100px)" }}>
                 {chatPanel}
-              </Box>
+              </Container>
             )}
 
             {chatView === "affix" && (
