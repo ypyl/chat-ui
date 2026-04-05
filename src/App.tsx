@@ -1,8 +1,7 @@
 import { ActionIcon, Affix, AppShell, Box, Burger, Dialog, Text, Portal, Container } from "@mantine/core";
 import "@mantine/core/styles.css";
 import { useDisclosure } from "@mantine/hooks";
-import { useRef, useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { useRef, useState } from "react";
 import { Link } from "wouter";
 import { ChatPanel } from "./ChatPanel";
 import { IconMessageCircle, IconQuote } from "@tabler/icons-react";
@@ -21,17 +20,6 @@ function App() {
   const textElementRef = useRef<HTMLDivElement>(null);
   const rects = useSelectionRects({ ignoreSelector: "button", containerRef: textElementRef });
   const endpoint = useSelectionEndPoint(rects);
-
-  const asideRef = useRef<HTMLDivElement>(null);
-  const [asidePortalContainer, setAsidePortalContainer] = useState<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (chatView === "aside") {
-      setAsidePortalContainer(asideRef.current);
-    } else {
-      setAsidePortalContainer(null);
-    }
-  }, [chatView]);
 
   const handleOpenChat = () => setChatView("dialog");
   const handleCloseChat = () => setChatView("affix");
@@ -130,8 +118,8 @@ function App() {
             )}
           </Container>
         </AppShell.Main>
-        <AppShell.Aside p="xs" ref={asideRef}>
-          {asidePortalContainer && chatView === "aside" && createPortal(chatPanel, asidePortalContainer)}
+        <AppShell.Aside p="xs">
+          {chatView === "aside" && chatPanel}
         </AppShell.Aside>
       </AppShell>
 
