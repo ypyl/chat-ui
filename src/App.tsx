@@ -44,6 +44,9 @@ function App() {
     const text = selection?.toString().trim() || "";
     if (text) {
       setTextToExplain(text);
+      if (chatView === "affix") {
+        setChatView("dialog");
+      }
       if (selection) {
         selection.removeAllRanges();
       }
