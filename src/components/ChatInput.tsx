@@ -3,6 +3,8 @@ import { IconQuote, IconSend } from "@tabler/icons-react";
 import { useEffect, useRef } from "react";
 import { useInput } from "../store/chatStore";
 
+const MAX_INPUT_SIZE = 16;// 16_384;
+
 interface ChatInputProps {
   referencedText?: string | null;
   onResetReferencedText?: () => void;
@@ -22,7 +24,7 @@ export function ChatInput({ referencedText, onResetReferencedText, onSend }: Cha
 
   return (
     <Paper shadow="xs" radius="md">
-      <Stack gap="xs" style={{ userSelect: "none" }}>
+      <Stack gap={0} style={{ userSelect: "none" }}>
         <Stack gap={0}>
           {referencedText && (
             <Paper
@@ -54,6 +56,7 @@ export function ChatInput({ referencedText, onResetReferencedText, onSend }: Cha
               autoFocus
               placeholder="Type message..."
               autosize
+              maxLength={MAX_INPUT_SIZE}
               minRows={1}
               maxRows={4}
               value={input}
@@ -68,11 +71,11 @@ export function ChatInput({ referencedText, onResetReferencedText, onSend }: Cha
             />
           </Box>
         </Stack>
-        <Box style={{ display: "flex", justifyContent: "flex-end" }} pr="sm" pb="xs">
-          <ActionIcon color="blue" onClick={() => onSend(input, setInput)}>
+        <Group justify="flex-end" p="xs">
+          <ActionIcon color="blue" onClick={() => onSend(input, setInput)} disabled={input.length > MAX_INPUT_SIZE}>
             <IconSend size={18} />
           </ActionIcon>
-        </Box>
+        </Group>
       </Stack>
     </Paper>
   );
