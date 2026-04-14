@@ -3,16 +3,43 @@ import { IconQuote } from "@tabler/icons-react";
 import { useState } from "react";
 import { Link } from "wouter";
 import { useSelectionRects } from "./useSelectionRects";
-import { useSelectionEndPoint } from "./useSelectionEndPoint";
 
 const sampleText = `Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?
 Lorem ipsum dolor sit amet <strong>consectetur adipisicing elit</strong>. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?
 Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?`;
 
+type Point = { x: number; y: number };
+
+function getSelectionEndPoint(rects: DOMRectList | DOMRect[]): Point | null {
+  if (rects.length === 0) {
+    return null;
+  }
+
+  let maxBottom = -Infinity;
+  let targetRect: DOMRect | null = null;
+
+  for (let i = 0; i < rects.length; i++) {
+    const rect = rects[i];
+    if (rect.bottom > maxBottom) {
+      maxBottom = rect.bottom;
+      targetRect = rect;
+    }
+  }
+
+  if (!targetRect) {
+    return null;
+  }
+
+  return {
+    x: targetRect.right,
+    y: targetRect.bottom,
+  };
+}
+
 export function TextSelectionPage() {
   const [selectedText, setSelectedText] = useState("");
   const rects = useSelectionRects();
-  const endpoint = useSelectionEndPoint(rects);
+  const endpoint = getSelectionEndPoint(rects);
 
   const handleExplain = () => {
     const selection = window.getSelection();

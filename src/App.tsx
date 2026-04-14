@@ -1,4 +1,4 @@
-import { ActionIcon, Affix, AppShell, Box, Burger, Dialog, Text, Portal, Container } from "@mantine/core";
+import { ActionIcon, Affix, AppShell, Box, Burger, Dialog, Text, Portal, Container, Switch } from "@mantine/core";
 import "@mantine/core/styles.css";
 import { useDisclosure } from "@mantine/hooks";
 import { useRef, useState } from "react";
@@ -6,20 +6,50 @@ import { Link } from "wouter";
 import { ChatPanel } from "./ChatPanel";
 import { IconMessageCircle, IconQuote } from "@tabler/icons-react";
 import { useSelectionRects } from "./useSelectionRects";
-import { useSelectionEndPoint } from "./useSelectionEndPoint";
+import { useSelectionEnabled } from "./store/chatStore";
 
 const fullText =
   "Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?";
 
 type ChatView = "affix" | "dialog" | "expanded" | "aside";
 
+type Point = { x: number; y: number };
+
+function getSelectionEndPoint(rects: DOMRectList | DOMRect[]): Point | null {
+  if (rects.length === 0) {
+    return null;
+  }
+
+  let maxBottom = -Infinity;
+  let targetRect: DOMRect | null = null;
+
+  for (let i = 0; i < rects.length; i++) {
+    const rect = rects[i];
+    if (rect.bottom > maxBottom) {
+      maxBottom = rect.bottom;
+      targetRect = rect;
+    }
+  }
+
+  if (!targetRect) {
+    return null;
+  }
+
+  return {
+    x: targetRect.right,
+    y: targetRect.bottom,
+  };
+}
+
+
 function App() {
   const [opened, { toggle }] = useDisclosure();
   const [chatView, setChatView] = useState<ChatView>("affix");
   const [textToExplain, setTextToExplain] = useState<string | null>(null);
   const textElementRef = useRef<HTMLDivElement>(null);
-  const rects = useSelectionRects({ ignoreSelector: "button", containerRef: textElementRef });
-  const endpoint = useSelectionEndPoint(rects);
+  const { selectionEnabled, setSelectionEnabled } = useSelectionEnabled();
+  const rects = useSelectionRects({ ignoreSelector: "button", containerRef: textElementRef, enabled: selectionEnabled });
+  const endpoint = getSelectionEndPoint(rects);
 
   const handleOpenChat = () => setChatView("dialog");
   const handleCloseChat = () => setChatView("affix");
@@ -74,6 +104,14 @@ function App() {
           <Link to="/selection" style={{ marginLeft: "auto", marginRight: 16 }}>
             Text Selection Demo
           </Link>
+          <Switch
+            checked={selectionEnabled}
+            onChange={(e) => setSelectionEnabled(e.currentTarget.checked)}
+            label="Selection"
+            labelPosition="left"
+            size="sm"
+            style={{ marginRight: 16 }}
+          />
         </AppShell.Header>
 
         <AppShell.Main style={{ overflow: "hidden" }}>

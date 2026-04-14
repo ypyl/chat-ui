@@ -19,6 +19,8 @@ interface ChatStore {
   selectionStart: number | null;
   selectionEnd: number | null;
   setSelectionRange: (start: number | null, end: number | null) => void;
+  selectionEnabled: boolean;
+  setSelectionEnabled: (enabled: boolean) => void;
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
@@ -32,6 +34,8 @@ export const useChatStore = create<ChatStore>((set) => ({
   selectionStart: null,
   selectionEnd: null,
   setSelectionRange: (selectionStart, selectionEnd) => set({ selectionStart, selectionEnd }),
+  selectionEnabled: true,
+  setSelectionEnabled: (enabled) => set({ selectionEnabled: enabled }),
 }));
 
 export const useMessages = () => {
@@ -50,3 +54,9 @@ export const useInput = () => {
 };
 
 export const useChat = () => useChatStore();
+
+export const useSelectionEnabled = () => {
+  const selectionEnabled = useChatStore((state) => state.selectionEnabled);
+  const setSelectionEnabled = useChatStore((state) => state.setSelectionEnabled);
+  return { selectionEnabled, setSelectionEnabled };
+};

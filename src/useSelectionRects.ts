@@ -3,12 +3,18 @@ import React, { useState, useEffect } from "react";
 type UseSelectionRectsOptions = {
   ignoreSelector?: string;
   containerRef?: React.RefObject<HTMLElement | null>;
+  enabled?: boolean;
 };
 
 export function useSelectionRects(options: UseSelectionRectsOptions = {}) {
+  const { enabled = true } = options;
   const [rects, setRects] = useState<DOMRect[]>([]);
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     const handleMouseUp = () => {
       setTimeout(() => {
         const selection = window.getSelection();
@@ -44,7 +50,7 @@ export function useSelectionRects(options: UseSelectionRectsOptions = {}) {
       document.removeEventListener("mouseup", handleMouseUp);
       document.removeEventListener("mousedown", handleMouseDown);
     };
-  }, [options.ignoreSelector, options.containerRef]);
+  }, [enabled, options.ignoreSelector, options.containerRef]);
 
   return rects;
 }
