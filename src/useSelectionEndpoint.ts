@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 
-type UseSelectionRectsOptions = {
+type Point = { x: number; y: number };
+
+type UseSelectionEndpointOptions = {
   ignoreSelector?: string;
   containerRef?: React.RefObject<HTMLElement | null>;
   enabled?: boolean;
 };
 
-export function useSelectionRects(options: UseSelectionRectsOptions = {}) {
+export function useSelectionEndpoint(options: UseSelectionEndpointOptions = {}): Point | null {
   const { enabled = true } = options;
-  const [rects, setRects] = useState<DOMRect[]>([]);
+  const [endpoint, setEndpoint] = useState<Point | null>(null);
 
   useEffect(() => {
     if (!enabled) {
@@ -23,15 +25,36 @@ export function useSelectionRects(options: UseSelectionRectsOptions = {}) {
             const { anchorNode, focusNode } = selection;
             const container = options.containerRef.current;
             if (!container.contains(anchorNode) || !container.contains(focusNode)) {
-              setRects([]);
+              setEndpoint(null);
               return;
             }
           }
           const range = selection.getRangeAt(0);
           const clientRects = range.getClientRects();
-          setRects(Array.from(clientRects));
+          
+          if (clientRects.length === 0) {
+            setEndpoint(null);
+            return;
+          }
+
+          let maxBottom = -Infinity;
+          let targetRect: DOMRect | null = null;
+
+          for (let i = 0; i < clientRects.length; i++) {
+            const rect = clientRects[i];
+            if (rect.bottom > maxBottom) {
+              maxBottom = rect.bottom;
+              targetRect = rect;
+            }
+          }
+
+          if (targetRect) {
+            setEndpoint({ x: targetRect.right, y: targetRect.bottom });
+          } else {
+            setEndpoint(null);
+          }
         } else {
-          setRects([]);
+          setEndpoint(null);
         }
       }, 10);
     };
@@ -40,7 +63,7 @@ export function useSelectionRects(options: UseSelectionRectsOptions = {}) {
       if (options.ignoreSelector && e.target instanceof Element && e.target.closest(options.ignoreSelector)) {
         return;
       }
-      setRects([]);
+      setEndpoint(null);
     };
 
     document.addEventListener("mouseup", handleMouseUp);
@@ -52,5 +75,5 @@ export function useSelectionRects(options: UseSelectionRectsOptions = {}) {
     };
   }, [enabled, options.ignoreSelector, options.containerRef]);
 
-  return rects;
+  return endpoint;
 }

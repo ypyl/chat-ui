@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { Link } from "wouter";
 import { ChatPanel } from "./ChatPanel";
 import { IconMessageCircle, IconQuote } from "@tabler/icons-react";
-import { useSelectionRects } from "./useSelectionRects";
+import { useSelectionEndpoint } from "./useSelectionEndpoint";
 import { useSelectionEnabled } from "./store/chatStore";
 
 const fullText =
@@ -13,43 +13,13 @@ const fullText =
 
 type ChatView = "affix" | "dialog" | "expanded" | "aside";
 
-type Point = { x: number; y: number };
-
-function getSelectionEndPoint(rects: DOMRectList | DOMRect[]): Point | null {
-  if (rects.length === 0) {
-    return null;
-  }
-
-  let maxBottom = -Infinity;
-  let targetRect: DOMRect | null = null;
-
-  for (let i = 0; i < rects.length; i++) {
-    const rect = rects[i];
-    if (rect.bottom > maxBottom) {
-      maxBottom = rect.bottom;
-      targetRect = rect;
-    }
-  }
-
-  if (!targetRect) {
-    return null;
-  }
-
-  return {
-    x: targetRect.right,
-    y: targetRect.bottom,
-  };
-}
-
-
 function App() {
   const [opened, { toggle }] = useDisclosure();
   const [chatView, setChatView] = useState<ChatView>("affix");
   const [textToExplain, setTextToExplain] = useState<string | null>(null);
   const textElementRef = useRef<HTMLDivElement>(null);
   const { selectionEnabled, setSelectionEnabled } = useSelectionEnabled();
-  const rects = useSelectionRects({ ignoreSelector: "button", containerRef: textElementRef, enabled: selectionEnabled });
-  const endpoint = getSelectionEndPoint(rects);
+  const endpoint = useSelectionEndpoint({ ignoreSelector: "button", containerRef: textElementRef, enabled: selectionEnabled });
 
   const handleOpenChat = () => setChatView("dialog");
   const handleCloseChat = () => setChatView("affix");
@@ -71,7 +41,7 @@ function App() {
     }
   };
 
-  const showButton = rects.length > 0;
+  const showButton = endpoint !== null;
 
   const chatPanel = (
     <ChatPanel
