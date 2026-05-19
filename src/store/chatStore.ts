@@ -21,9 +21,13 @@ interface ChatStore {
   setSelectionRange: (start: number | null, end: number | null) => void;
   selectionEnabled: boolean;
   setSelectionEnabled: (enabled: boolean) => void;
+  isStreaming: boolean;
+  setIsStreaming: (streaming: boolean) => void;
+  streamAbortController: AbortController | null;
+  setStreamAbortController: (ctrl: AbortController | null) => void;
 }
 
-export const useChatStore = create<ChatStore>((set) => ({
+export const useChatStore = create<ChatStore>((set, get) => ({
   turns: [],
   setTurns: (turnsOrUpdater) =>
     set((state) => ({
@@ -36,12 +40,38 @@ export const useChatStore = create<ChatStore>((set) => ({
   setSelectionRange: (selectionStart, selectionEnd) => set({ selectionStart, selectionEnd }),
   selectionEnabled: true,
   setSelectionEnabled: (enabled) => set({ selectionEnabled: enabled }),
+  isStreaming: false,
+  setIsStreaming: (streaming) => set({ isStreaming: streaming }),
+  streamAbortController: null,
+  setStreamAbortController: (ctrl) => {
+    // Abort the previous controller before replacing it
+    const prev = get().streamAbortController;
+    if (prev && prev !== ctrl) {
+      prev.abort();
+    }
+    set({ streamAbortController: ctrl });
+  },
 }));
 
 export const useMessages = () => {
   const turns = useChatStore((state) => state.turns);
   const setTurns = useChatStore((state) => state.setTurns);
   return { turns, setTurns };
+};
+
+export const useStreaming = () => {
+  const isStreaming = useChatStore((state) => state.isStreaming);
+  const setIsStreaming = useChatStore((state) => state.setIsStreaming);
+  const streamAbortController = useChatStore((state) => state.streamAbortController);
+  const setStreamAbortController = useChatStore((state) => state.setStreamAbortController);
+  return { isStreaming, setIsStreaming, streamAbortController, setStreamAbortController };
+};
+
+export const stopStreaming = () => {
+  const { streamAbortController, setIsStreaming, setStreamAbortController } = useChatStore.getState();
+  streamAbortController?.abort();
+  setStreamAbortController(null);
+  setIsStreaming(false);
 };
 
 export const useInput = () => {

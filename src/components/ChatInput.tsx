@@ -1,17 +1,19 @@
 import { ActionIcon, Box, CloseButton, Group, Paper, Stack, Text, Textarea } from "@mantine/core";
-import { IconQuote, IconSend } from "@tabler/icons-react";
+import { IconPlayerStop, IconQuote, IconSend } from "@tabler/icons-react";
 import { useEffect, useRef } from "react";
 import { useInput } from "../store/chatStore";
 
-const MAX_INPUT_SIZE = 16;// 16_384;
+const MAX_INPUT_SIZE = 16_384;
 
 interface ChatInputProps {
   referencedText?: string | null;
   onResetReferencedText?: () => void;
   onSend: (input: string, setInput: (v: string) => void) => void;
+  isStreaming?: boolean;
+  onStop?: () => void;
 }
 
-export function ChatInput({ referencedText, onResetReferencedText, onSend }: ChatInputProps) {
+export function ChatInput({ referencedText, onResetReferencedText, onSend, isStreaming, onStop }: ChatInputProps) {
   const { input, setInput, selectionStart, selectionEnd, setSelectionRange } = useInput();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -63,7 +65,7 @@ export function ChatInput({ referencedText, onResetReferencedText, onSend }: Cha
               onChange={(e) => setInput(e.currentTarget.value)}
               onSelect={(e) => setSelectionRange(e.currentTarget.selectionStart, e.currentTarget.selectionEnd)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && !e.shiftKey && !isStreaming) {
                   e.preventDefault();
                   onSend(input, setInput);
                 }
@@ -72,9 +74,15 @@ export function ChatInput({ referencedText, onResetReferencedText, onSend }: Cha
           </Box>
         </Stack>
         <Group justify="flex-end" p="xs">
-          <ActionIcon color="blue" onClick={() => onSend(input, setInput)} disabled={input.length > MAX_INPUT_SIZE}>
-            <IconSend size={18} />
-          </ActionIcon>
+          {isStreaming ? (
+            <ActionIcon variant="filled" color="red" onClick={onStop}>
+              <IconPlayerStop size={18} />
+            </ActionIcon>
+          ) : (
+            <ActionIcon color="blue" onClick={() => onSend(input, setInput)} disabled={input.length > MAX_INPUT_SIZE}>
+              <IconSend size={18} />
+            </ActionIcon>
+          )}
         </Group>
       </Stack>
     </Paper>

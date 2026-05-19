@@ -2,7 +2,7 @@ import { ActionIcon, Button, CloseButton, Group, ScrollArea, Skeleton, Stack, Te
 import { IconMaximize, IconMinimize, IconLayoutSidebarRight } from "@tabler/icons-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { useMessages, turnsToMessages, type Turn } from "./store/chatStore";
+import { useMessages, useStreaming, stopStreaming, turnsToMessages, type Turn } from "./store/chatStore";
 import { ChatInput } from "./components/ChatInput";
 import { MessageBubble } from "./components/MessageBubble";
 
@@ -30,10 +30,18 @@ export function ChatPanel({
   onResetReferencedText,
 }: ChatPanelProps) {
   const { turns, setTurns } = useMessages();
+  const { isStreaming, setIsStreaming, setStreamAbortController } = useStreaming();
   const viewport = useRef<HTMLDivElement>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
   const turnRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-  const [isLoading, setIsLoading] = useState(false);
+
+  // Handle referenced text: prepend as a hidden system message for the next send
+  const pendingRefText = useRef<string | null>(null);
+  useEffect(() => {
+    if (referencedText) {
+      pendingRefText.current = referencedText;
+    }
+  }, [referencedText]);
 
   useEffect(() => {
     if (viewport.current) setViewportHeight(viewport.current.clientHeight);
@@ -92,8 +100,83 @@ export function ChatPanel({
     [setTurns],
   );
 
+  const finishStream = useCallback(() => {
+    setIsStreaming(false);
+    setStreamAbortController(null);
+  }, [setIsStreaming, setStreamAbortController]);
+
+  const startStream = useCallback(
+    (turnIndex: number, messagesToSend: { role: string; text: string }[]) => {
+      // Abort any previous stream (setStreamAbortController handles this automatically)
+      const controller = new AbortController();
+      setStreamAbortController(controller);
+      setIsStreaming(true);
+
+      let fullResponse = "";
+
+      setTimeout(() => {
+        turnRefs.current.get(turnIndex)?.scrollIntoView({ block: "start", behavior: "smooth" });
+      }, 0);
+
+      const handleError = () => {
+        setTurns((prev) => {
+          const updated = [...prev];
+          // Only set error if the agent message is still empty (wasn't aborted mid-stream with partial content)
+          if (!updated[turnIndex]?.agent?.text) {
+            updated[turnIndex] = {
+              ...updated[turnIndex],
+              agent: { role: "agent", text: "Failed to get response. Please try again.", isError: true },
+            };
+          }
+          return updated;
+        });
+        finishStream();
+      };
+
+      // Run the stream; we don't await — errors/close are handled in callbacks.
+      // The promise resolves when the stream ends or is aborted.
+      fetchEventSource("/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(messagesToSend),
+        signal: controller.signal,
+        onmessage(ev) {
+          if (ev.data) {
+            fullResponse += ev.data;
+            setTurns((prev) => {
+              const updated = [...prev];
+              updated[turnIndex] = { ...updated[turnIndex], agent: { role: "agent", text: fullResponse } };
+              return updated;
+            });
+          }
+        },
+        onclose() {
+          finishStream();
+        },
+        onerror(err) {
+          // Don't treat abort as an error
+          if (controller.signal.aborted) {
+            finishStream();
+            return;
+          }
+          handleError();
+          // Return a number to suppress automatic retry, or omit to let it retry
+          throw err;
+        },
+      }).catch(() => {
+        // If the stream was aborted, we already cleaned up in onerror.
+        // For unexpected failures, handle error.
+        if (!controller.signal.aborted) {
+          handleError();
+        }
+      });
+    },
+    [setIsStreaming, setStreamAbortController, setTurns, finishStream],
+  );
+
   const regenerateAgentMessage = useCallback(
-    async (turnIndex: number) => {
+    (turnIndex: number) => {
+      if (isStreaming) return;
       const messagesToSend = turnsToMessages(turns.slice(0, turnIndex)).concat(turns[turnIndex].user);
 
       setTurns((prev) => {
@@ -101,119 +184,35 @@ export function ChatPanel({
         updated[turnIndex] = { ...updated[turnIndex], agent: null };
         return updated;
       });
-      setIsLoading(true);
-      let fullResponse = "";
 
-      setTimeout(() => {
-        turnRefs.current.get(turnIndex)?.scrollIntoView({ block: "start", behavior: "smooth" });
-      }, 0);
-
-      try {
-        await fetchEventSource("/chat/stream", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(messagesToSend),
-          onmessage(ev) {
-            if (ev.data) {
-              fullResponse += ev.data;
-              setTurns((prev) => {
-                const updated = [...prev];
-                updated[turnIndex] = { ...updated[turnIndex], agent: { role: "agent", text: fullResponse } };
-                return updated;
-              });
-            }
-          },
-          onclose() {
-            setIsLoading(false);
-          },
-          onerror() {
-            setTurns((prev) => {
-              const updated = [...prev];
-              updated[turnIndex] = {
-                ...updated[turnIndex],
-                agent: { role: "agent", text: "Failed to get response. Please try again.", isError: true },
-              };
-              return updated;
-            });
-            setIsLoading(false);
-          },
-        });
-      } catch {
-        setTurns((prev) => {
-          const updated = [...prev];
-          updated[turnIndex] = {
-            ...updated[turnIndex],
-            agent: { role: "agent", text: "Failed to get response. Please try again.", isError: true },
-          };
-          return updated;
-        });
-        setIsLoading(false);
-      }
+      startStream(turnIndex, messagesToSend);
     },
-    [turns, setTurns],
+    [turns, isStreaming, setTurns, startStream],
   );
 
   const sendMessage = useCallback(
-    async (input: string, setInput: (v: string) => void) => {
-      if (!input.trim() || isLoading) return;
+    (input: string, setInput: (v: string) => void) => {
+      if (!input.trim() || isStreaming) return;
 
-      const newTurn: Turn = { user: { role: "user", text: input }, agent: null };
+      // Consume any pending referenced text for this message
+      const refText = pendingRefText.current;
+      if (refText) {
+        pendingRefText.current = null;
+        onResetReferencedText?.();
+      }
+
+      const userText = refText ? `Context: ${refText}\n\nQuestion: ${input}` : input;
+
+      const newTurn: Turn = { user: { role: "user", text: userText }, agent: null };
       const newTurnIndex = turns.length;
 
       setTurns((prev) => [...prev, newTurn]);
       setInput("");
-      setIsLoading(true);
 
       const allMessages = turnsToMessages([...turns, newTurn]);
-      let fullResponse = "";
-
-      setTimeout(() => {
-        turnRefs.current.get(newTurnIndex)?.scrollIntoView({ block: "start", behavior: "smooth" });
-      }, 0);
-
-      try {
-        await fetchEventSource("/chat/stream", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(allMessages),
-          onmessage(ev) {
-            if (ev.data) {
-              fullResponse += ev.data;
-              setTurns((prev) => {
-                const updated = [...prev];
-                updated[newTurnIndex] = { ...updated[newTurnIndex], agent: { role: "agent", text: fullResponse } };
-                return updated;
-              });
-            }
-          },
-          onclose() {
-            setIsLoading(false);
-          },
-          onerror() {
-            setTurns((prev) => {
-              const updated = [...prev];
-              updated[newTurnIndex] = {
-                ...updated[newTurnIndex],
-                agent: { role: "agent", text: "Failed to get response. Please try again.", isError: true },
-              };
-              return updated;
-            });
-            setIsLoading(false);
-          },
-        });
-      } catch {
-        setTurns((prev) => {
-          const updated = [...prev];
-          updated[newTurnIndex] = {
-            ...updated[newTurnIndex],
-            agent: { role: "agent", text: "Failed to get response. Please try again.", isError: true },
-          };
-          return updated;
-        });
-        setIsLoading(false);
-      }
+      startStream(newTurnIndex, allMessages);
     },
-    [turns, isLoading, setTurns],
+    [turns, isStreaming, setTurns, startStream, onResetReferencedText],
   );
 
   return (
@@ -300,7 +299,13 @@ export function ChatPanel({
         </Stack>
       </ScrollArea>
 
-      <ChatInput referencedText={referencedText} onResetReferencedText={onResetReferencedText} onSend={sendMessage} />
+      <ChatInput
+        referencedText={referencedText}
+        onResetReferencedText={onResetReferencedText}
+        onSend={sendMessage}
+        isStreaming={isStreaming}
+        onStop={stopStreaming}
+      />
     </Stack>
   );
 }
