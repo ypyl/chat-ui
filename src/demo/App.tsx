@@ -1,7 +1,7 @@
 import { ActionIcon, Affix, AppShell, Box, Burger, Dialog, Text, Portal, Container, Switch } from "@mantine/core";
 import "@mantine/core/styles.css";
 import { useDisclosure } from "@mantine/hooks";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Link } from "wouter";
 import { ChatPanel } from "../lib";
 import { useSelectionEndpoint } from "./useSelectionEndpoint";
@@ -21,11 +21,14 @@ function App() {
   const [selectionEnabled, setSelectionEnabled] = useState(true);
   const endpoint = useSelectionEndpoint({ ignoreSelector: "button", containerRef: textElementRef, enabled: selectionEnabled });
 
-  const handleOpenChat = () => setChatView("dialog");
-  const handleCloseChat = () => setChatView("affix");
-  const handleExpand = () => setChatView("expanded");
-  const handleMoveToAside = () => setChatView("aside");
-  const handleMinimize = () => setChatView("dialog");
+  // Stable identities: the panel is memoised, and selection tracking re-renders this component on
+  // every mouseup, so new callbacks here would re-render the whole transcript for nothing.
+  const handleOpenChat = useCallback(() => setChatView("dialog"), []);
+  const handleCloseChat = useCallback(() => setChatView("affix"), []);
+  const handleExpand = useCallback(() => setChatView("expanded"), []);
+  const handleMoveToAside = useCallback(() => setChatView("aside"), []);
+  const handleMinimize = useCallback(() => setChatView("dialog"), []);
+  const handleResetReferencedText = useCallback(() => setTextToExplain(null), []);
 
   const handleExplainClick = () => {
     const selection = window.getSelection();
@@ -52,7 +55,7 @@ function App() {
       onMoveToDialog={handleMinimize}
       onClose={handleCloseChat}
       referencedText={textToExplain}
-      onResetReferencedText={() => setTextToExplain(null)}
+      onResetReferencedText={handleResetReferencedText}
     />
   );
 

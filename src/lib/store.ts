@@ -27,6 +27,14 @@ export function groupTurns(messages: Message[]): Turn[] {
   return turns;
 }
 
+/**
+ * Whether two versions of a message render the same. The AG-UI client re-emits the whole transcript
+ * on every event and rebuilds message objects, so reference equality says nothing; ids and content
+ * do. This is what keeps memoised bubbles from re-rendering once per streaming token.
+ */
+export const isSameMessage = (a: Message, b: Message): boolean =>
+  a === b || (a.id === b.id && a.role === b.role && a.content === b.content && a.metadata === b.metadata);
+
 const flags = (message: Message) => (message.metadata ?? {}) as { deleted?: boolean; isError?: boolean };
 
 export const isDeleted = (message: Message) => flags(message).deleted === true;
@@ -41,6 +49,28 @@ export const turnReasoning = (turn: Turn): string =>
 
 /** Everything the agent said, with the reasoning split out for separate rendering. */
 export const turnAnswers = (turn: Turn): Message[] => turn.replies.filter((message) => message.role !== "reasoning");
+
+/**
+ * Hides a turn: the question and every reply it produced, up to the next question. Any message of
+ * the turn can identify it, so a bubble can call this without knowing where the turn sits.
+ */
+export function setTurnDeleted(messages: Message[], messageId: string, deleted: boolean): Message[] {
+  const index = messages.findIndex((message) => message.id === messageId);
+  if (index < 0) return messages;
+
+  // The id can belong to the question or to any of its replies, so walk back to the question first.
+  let start = index;
+  while (start > 0 && messages[start].role !== "user") start--;
+
+  const ids = new Set([messages[start].id]);
+  for (let i = start + 1; i < messages.length && messages[i].role !== "user"; i++) {
+    ids.add(messages[i].id);
+  }
+
+  return messages.map((message) =>
+    ids.has(message.id) ? ({ ...message, metadata: { ...message.metadata, deleted } } as Message) : message,
+  );
+}
 
 export interface ChatState {
   messages: Message[];

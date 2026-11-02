@@ -18,13 +18,14 @@ import { IconCheck, IconCopy, IconEdit, IconRefresh, IconTrash, IconX } from "@t
 import { memo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { isError } from "../store";
+import { isError, isSameMessage } from "../store";
 
 interface MessageBubbleProps {
   message: Message;
-  onSaveEdit: (text: string) => void;
-  onDeleteTurn: () => void;
-  onRegenerate?: () => void;
+  /** Both handlers receive the message id, so the parent can keep one identity for every bubble. */
+  onSaveEdit: (messageId: string, text: string) => void;
+  onDeleteTurn: (messageId: string) => void;
+  onRegenerate?: (messageId: string) => void;
 }
 
 const markdownComponents = {
@@ -84,12 +85,7 @@ const MarkdownContent = memo(function MarkdownContent({ text }: { text: string }
   );
 });
 
-export const MessageBubble = memo(function MessageBubble({
-  message,
-  onSaveEdit,
-  onDeleteTurn,
-  onRegenerate,
-}: MessageBubbleProps) {
+function MessageBubbleImpl({ message, onSaveEdit, onDeleteTurn, onRegenerate }: MessageBubbleProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState("");
   // Activity messages carry arbitrary structured data rather than text, and this UI does not render them.
@@ -102,7 +98,7 @@ export const MessageBubble = memo(function MessageBubble({
 
   const handleSaveEdit = () => {
     if (!editText.trim()) return;
-    onSaveEdit(editText);
+    onSaveEdit(message.id, editText);
     setIsEditing(false);
   };
 
@@ -165,7 +161,7 @@ export const MessageBubble = memo(function MessageBubble({
           </CopyButton>
         )}
         {message.role === "assistant" && onRegenerate && (
-          <ActionIcon size="xs" variant="subtle" color="gray" onClick={onRegenerate}>
+          <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => onRegenerate(message.id)}>
             <IconRefresh size={12} />
           </ActionIcon>
         )}
@@ -184,10 +180,23 @@ export const MessageBubble = memo(function MessageBubble({
             </ActionIcon>
           </Group>
         )}
-        <ActionIcon size="xs" variant="subtle" color="red" onClick={onDeleteTurn}>
+        <ActionIcon size="xs" variant="subtle" color="red" onClick={() => onDeleteTurn(message.id)}>
           <IconTrash size={12} />
         </ActionIcon>
       </Group>
     </Stack>
   );
-});
+}
+
+/**
+ * Compared by message value and callback identity: the transcript is rebuilt on every token, so the
+ * default shallow compare would re-render every settled bubble with each delta.
+ */
+export const MessageBubble = memo(
+  MessageBubbleImpl,
+  (a, b) =>
+    isSameMessage(a.message, b.message) &&
+    a.onSaveEdit === b.onSaveEdit &&
+    a.onDeleteTurn === b.onDeleteTurn &&
+    a.onRegenerate === b.onRegenerate,
+);

@@ -1,20 +1,17 @@
-import { ActionIcon, Button, CloseButton, Group, ScrollArea, Skeleton, Stack, Text } from "@mantine/core";
+import { ActionIcon, CloseButton, Group, ScrollArea, Stack, Text } from "@mantine/core";
 import { IconMaximize, IconMinimize, IconLayoutSidebarRight } from "@tabler/icons-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChatContext } from "./context";
 import {
   groupTurns,
-  isDeleted,
-  turnAnswers,
-  turnReasoning,
+  setTurnDeleted,
   useChatMessages,
   useChatStreaming,
   useStopStreaming,
 } from "./store";
 import type { Message, UserMessage } from "@ag-ui/core";
 import { ChatInput } from "./components/ChatInput";
-import { MessageBubble } from "./components/MessageBubble";
-import { ReasoningBlock } from "./components/ReasoningBlock";
+import { ChatTurn } from "./components/ChatTurn";
 
 type ChatView = "affix" | "dialog" | "expanded" | "aside";
 
@@ -30,7 +27,7 @@ interface ChatPanelProps {
   onResetReferencedText?: () => void;
 }
 
-export function ChatPanel({
+export const ChatPanel = memo(function ChatPanel({
   title = "Chat with AI",
   viewMode,
   onExpand,
@@ -44,7 +41,7 @@ export function ChatPanel({
   const { messages, setMessages } = useChatMessages();
   const { isStreaming, setIsStreaming, setStreamAbortController } = useChatStreaming();
   const stopStreaming = useStopStreaming();
-  const { transport } = useChatContext();
+  const { store, transport } = useChatContext();
   const turns = useMemo(() => groupTurns(messages), [messages]);
   const viewport = useRef<HTMLDivElement>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -65,24 +62,36 @@ export function ChatPanel({
     }, 0);
   }, [turns.length]);
 
-  const updateMessage = useCallback(
-    (id: string, patch: Partial<Message>) => {
-      setMessages((prev) => prev.map((message) => (message.id === id ? ({ ...message, ...patch } as Message) : message)));
+  const saveEdit = useCallback(
+    (messageId: string, text: string) => {
+      setMessages((prev) =>
+        prev.map((message) => (message.id === messageId ? ({ ...message, content: text } as Message) : message)),
+      );
     },
     [setMessages],
   );
 
-  const setTurnDeleted = useCallback(
-    (turnIndexes: number[], deleted: boolean) => {
-      const ids = new Set(turnIndexes.flatMap((i) => [turns[i].user, ...turns[i].replies].map((m) => m.id)));
-      setMessages((prev) =>
-        prev.map((message) =>
-          ids.has(message.id) ? ({ ...message, metadata: { ...message.metadata, deleted } } as Message) : message,
-        ),
-      );
+  // Every handler below takes an id rather than a turn index and reads the live state from the
+  // store, so they keep one identity for the life of the panel. That is what lets ChatTurn sit
+  // behind memo while the transcript is replaced on every streaming token.
+  const deleteTurn = useCallback(
+    (messageId: string) => {
+      setMessages((prev) => setTurnDeleted(prev, messageId, true));
     },
-    [turns, setMessages],
+    [setMessages],
   );
+
+  const restoreTurn = useCallback(
+    (messageId: string) => {
+      setMessages((prev) => setTurnDeleted(prev, messageId, false));
+    },
+    [setMessages],
+  );
+
+  const registerTurn = useCallback((index: number, element: HTMLDivElement | null) => {
+    if (element) turnRefs.current.set(index, element);
+    else turnRefs.current.delete(index);
+  }, []);
 
   const finishStream = useCallback(() => {
     setIsStreaming(false);
@@ -130,16 +139,22 @@ export function ChatPanel({
   );
 
   const regenerateAgentMessage = useCallback(
-    (turnIndex: number) => {
-      if (isStreaming) return;
+    (messageId: string) => {
+      const state = store.getState();
+      if (state.isStreaming) return;
+
       // Drop this turn's answer and everything after it, then run again from the question.
-      const cutoff = messages.findIndex((message) => message.id === turns[turnIndex].user.id);
-      if (cutoff < 0) return;
-      const history = messages.slice(0, cutoff + 1);
-      setMessages(history);
+      const answerIndex = state.messages.findIndex((message) => message.id === messageId);
+      if (answerIndex < 0) return;
+
+      let questionIndex = answerIndex;
+      while (questionIndex > 0 && state.messages[questionIndex].role !== "user") questionIndex--;
+
+      const history = state.messages.slice(0, questionIndex + 1);
+      state.setMessages(history);
       runTurn(history);
     },
-    [turns, messages, isStreaming, setMessages, runTurn],
+    [store, runTurn],
   );
 
   const sendMessage = useCallback(
@@ -198,59 +213,20 @@ export function ChatPanel({
 
       <ScrollArea type="scroll" style={{ flex: 1, cursor: "default" }} viewportRef={viewport}>
         <Stack gap={0}>
-          {turns.map((turn, i) => {
-            const isLast = i === turns.length - 1;
-            return (
-              <Stack
-                key={i}
-                ref={(el) => {
-                  if (el) {
-                    turnRefs.current.set(i, el);
-                  }
-                }}
-                gap="xs"
-                style={{
-                  minHeight: isLast ? viewportHeight || "100%" : undefined,
-                  justifyContent: "flex-start",
-                  paddingTop: "var(--mantine-spacing-xs)",
-                }}
-              >
-                {isDeleted(turn.user) ? (
-                  <Button variant="transparent" size="xs" p={4} onClick={() => setTurnDeleted([i], false)}>
-                    Restore deleted messages
-                  </Button>
-                ) : (
-                  <>
-                    <Stack gap={2} align="flex-end">
-                      <MessageBubble
-                        message={turn.user}
-                        onSaveEdit={(text) => updateMessage(turn.user.id, { content: text } as Partial<Message>)}
-                        onDeleteTurn={() => setTurnDeleted([i], true)}
-                      />
-                    </Stack>
-                    <Stack gap={2} align="flex-start">
-                      {turn.replies.length === 0 ? (
-                        <Skeleton height={48} />
-                      ) : (
-                        <>
-                          <ReasoningBlock text={turnReasoning(turn)} />
-                          {turnAnswers(turn).map((reply) => (
-                            <MessageBubble
-                              key={reply.id}
-                              message={reply}
-                              onSaveEdit={(text) => updateMessage(reply.id, { content: text } as Partial<Message>)}
-                              onDeleteTurn={() => setTurnDeleted([i], true)}
-                              onRegenerate={reply.role === "assistant" ? () => regenerateAgentMessage(i) : undefined}
-                            />
-                          ))}
-                        </>
-                      )}
-                    </Stack>
-                  </>
-                )}
-              </Stack>
-            );
-          })}
+          {turns.map((turn, i) => (
+            <ChatTurn
+              key={turn.user.id}
+              turn={turn}
+              index={i}
+              isLast={i === turns.length - 1}
+              viewportHeight={viewportHeight}
+              registerTurn={registerTurn}
+              onSaveEdit={saveEdit}
+              onDeleteTurn={deleteTurn}
+              onRestoreTurn={restoreTurn}
+              onRegenerate={regenerateAgentMessage}
+            />
+          ))}
         </Stack>
       </ScrollArea>
 
@@ -263,4 +239,4 @@ export function ChatPanel({
       />
     </Stack>
   );
-}
+});

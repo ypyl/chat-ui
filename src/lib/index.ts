@@ -12,6 +12,8 @@ export {
   groupTurns,
   isDeleted,
   isError,
+  isSameMessage,
+  setTurnDeleted,
   turnAnswers,
   turnReasoning,
   useChatInput,
