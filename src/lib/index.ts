@@ -3,7 +3,6 @@ export type { ChatProviderProps } from "./ChatProvider";
 export { ChatWidget } from "./ChatWidget";
 export type { ChatWidgetProps } from "./ChatWidget";
 export { ChatPanel } from "./ChatPanel";
-export { useSelectionEndpoint } from "./useSelectionEndpoint";
 
 export { createAgUiTransport } from "./transport";
 export type { ChatTransport, ChatTransportRun, AgUiTransportOptions } from "./transport";

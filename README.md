@@ -78,16 +78,20 @@ const transport = {
 ```
 
 Build a stable transport (module constant or `useMemo`): the provider reads it once on mount.
-
-`createAgUiTransport({ url, threadId })` is the default implementation, exported if you want to
-wrap it, and `useSelectionEndpoint` is exported for building your own select-to-ask affordance.
+`createAgUiTransport({ url, threadId })` is the default implementation, exported if you want to wrap it.
 
 ## Selection to question
 
-`useSelectionEndpoint({ containerRef, ignoreSelector, enabled })` returns `{ x, y }` for the current
-selection, or `null`. Position an `ActionIcon` there, and pass the selected text to `ChatPanel` as
-`referencedText`: it shows up as a quoted chip above the input and is sent as context with the next
-question.
+The panel accepts `referencedText`, whatever produced it. Show a button near the selection on your
+side, then hand the text over: it appears as a quoted chip above the input and is sent as context
+with the next question.
+
+```tsx
+<ChatPanel referencedText={selectedText} onResetReferencedText={() => setSelectedText(null)} />
+```
+
+The demo app's `src/demo/useSelectionEndpoint.ts` shows one way to find `{ x, y }` for the current
+selection. It is sample code, not part of the package.
 
 ## One conversation per provider
 

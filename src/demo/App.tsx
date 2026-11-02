@@ -3,7 +3,8 @@ import "@mantine/core/styles.css";
 import { useDisclosure } from "@mantine/hooks";
 import { useRef, useState } from "react";
 import { Link } from "wouter";
-import { ChatPanel, useSelectionEndpoint } from "../lib";
+import { ChatPanel } from "../lib";
+import { useSelectionEndpoint } from "./useSelectionEndpoint";
 import { IconMessageCircle, IconQuote } from "@tabler/icons-react";
 
 

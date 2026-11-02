@@ -2,7 +2,7 @@ import { ActionIcon, Button, Card, Divider, Group, Stack, Text, Title } from "@m
 import { IconQuote } from "@tabler/icons-react";
 import { useState } from "react";
 import { Link } from "wouter";
-import { useSelectionEndpoint } from "../lib";
+import { useSelectionEndpoint } from "./useSelectionEndpoint";
 
 const sampleText = `Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?
 Lorem ipsum dolor sit amet <strong>consectetur adipisicing elit</strong>. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?
