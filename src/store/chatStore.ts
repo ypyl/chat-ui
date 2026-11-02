@@ -1,6 +1,12 @@
 import { create } from "zustand";
 
-export type Message = { role: "user" | "agent"; text: string; deleted?: boolean; isError?: boolean };
+export type Message = {
+  role: "user" | "agent";
+  text: string;
+  reasoning?: string;
+  deleted?: boolean;
+  isError?: boolean;
+};
 
 export type Turn = {
   user: Message;

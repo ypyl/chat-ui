@@ -1,8 +1,8 @@
 import { ActionIcon, Button, CloseButton, Group, ScrollArea, Skeleton, Stack, Text } from "@mantine/core";
 import { IconMaximize, IconMinimize, IconLayoutSidebarRight } from "@tabler/icons-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { useMessages, useStreaming, stopStreaming, turnsToMessages, type Turn } from "./store/chatStore";
+import { runAgentTurn } from "./agui";
+import { useMessages, useStreaming, stopStreaming, turnsToMessages, type Message, type Turn } from "./store/chatStore";
 import { ChatInput } from "./components/ChatInput";
 import { MessageBubble } from "./components/MessageBubble";
 
@@ -106,17 +106,24 @@ export function ChatPanel({
   }, [setIsStreaming, setStreamAbortController]);
 
   const startStream = useCallback(
-    (turnIndex: number, messagesToSend: { role: string; text: string }[]) => {
+    (turnIndex: number, messagesToSend: Message[]) => {
       // Abort any previous stream (setStreamAbortController handles this automatically)
       const controller = new AbortController();
       setStreamAbortController(controller);
       setIsStreaming(true);
 
-      let fullResponse = "";
-
       setTimeout(() => {
         turnRefs.current.get(turnIndex)?.scrollIntoView({ block: "start", behavior: "smooth" });
       }, 0);
+
+      const patchAgent = (patch: Partial<Message>) => {
+        setTurns((prev) => {
+          const updated = [...prev];
+          const current = updated[turnIndex]?.agent ?? { role: "agent" as const, text: "" };
+          updated[turnIndex] = { ...updated[turnIndex], agent: { ...current, ...patch } };
+          return updated;
+        });
+      };
 
       const handleError = () => {
         setTurns((prev) => {
@@ -130,47 +137,23 @@ export function ChatPanel({
           }
           return updated;
         });
-        finishStream();
       };
 
-      // Run the stream; we don't await — errors/close are handled in callbacks.
-      // The promise resolves when the stream ends or is aborted.
-      fetchEventSource("/chat/stream", {
-        method: "POST",
-        openWhenHidden: true,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(messagesToSend),
-        signal: controller.signal,
-        onmessage(ev) {
-          if (ev.data) {
-            fullResponse += ev.data;
-            setTurns((prev) => {
-              const updated = [...prev];
-              updated[turnIndex] = { ...updated[turnIndex], agent: { role: "agent", text: fullResponse } };
-              return updated;
-            });
+      // Each event carries the accumulated buffer, so the turn is replaced rather than appended to.
+      // The promise resolves on RUN_FINISHED and on abort; only real failures reject.
+      runAgentTurn({
+        messages: messagesToSend,
+        abortController: controller,
+        onText: (text) => patchAgent({ text }),
+        onReasoning: (reasoning) => patchAgent({ reasoning }),
+      })
+        .catch((err) => {
+          if (!controller.signal.aborted) {
+            console.error("[chat] stream failed", err);
+            handleError();
           }
-        },
-        onclose() {
-          finishStream();
-        },
-        onerror(err) {
-          // Don't treat abort as an error
-          if (controller.signal.aborted) {
-            finishStream();
-            return;
-          }
-          handleError();
-          // Return a number to suppress automatic retry, or omit to let it retry
-          throw err;
-        },
-      }).catch(() => {
-        // If the stream was aborted, we already cleaned up in onerror.
-        // For unexpected failures, handle error.
-        if (!controller.signal.aborted) {
-          handleError();
-        }
-      });
+        })
+        .finally(finishStream);
     },
     [setIsStreaming, setStreamAbortController, setTurns, finishStream],
   );

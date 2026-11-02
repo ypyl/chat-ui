@@ -134,7 +134,21 @@ export const MessageBubble = memo(function MessageBubble({
     }
 
     if (message.role === "agent") {
-      return <MarkdownContent text={message.text} />;
+      return (
+        <>
+          {message.reasoning && (
+            <Box component="details" mb={4}>
+              <Text component="summary" size="xs" c="dimmed" style={{ cursor: "pointer" }}>
+                Reasoning
+              </Text>
+              <Text size="xs" c="dimmed" fs="italic" style={{ whiteSpace: "pre-wrap" }}>
+                {message.reasoning}
+              </Text>
+            </Box>
+          )}
+          <MarkdownContent text={message.text} />
+        </>
+      );
     }
 
     return (
