@@ -136,19 +136,6 @@ export const MessageBubble = memo(function MessageBubble({
       );
     }
 
-    if (message.role === "reasoning") {
-      return (
-        <Box component="details">
-          <Text component="summary" size="xs" c="dimmed" style={{ cursor: "pointer" }}>
-            Reasoning
-          </Text>
-          <Text size="xs" c="dimmed" fs="italic" style={{ whiteSpace: "pre-wrap" }}>
-            {text}
-          </Text>
-        </Box>
-      );
-    }
-
     if (message.role === "assistant") {
       return <MarkdownContent text={text} />;
     }
@@ -161,11 +148,6 @@ export const MessageBubble = memo(function MessageBubble({
       </Paper>
     );
   };
-
-  // Reasoning is protocol output shown for context, not a turn the user manages.
-  if (message.role === "reasoning") {
-    return renderContent();
-  }
 
   return (
     <Stack gap="xs">

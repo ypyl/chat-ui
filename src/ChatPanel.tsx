@@ -2,10 +2,11 @@ import { ActionIcon, Button, CloseButton, Group, ScrollArea, Skeleton, Stack, Te
 import { IconMaximize, IconMinimize, IconLayoutSidebarRight } from "@tabler/icons-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { runAgentTurn } from "./agui";
-import { groupTurns, isDeleted, useMessages, useStreaming, stopStreaming } from "./store/chatStore";
+import { groupTurns, isDeleted, turnAnswers, turnReasoning, useMessages, useStreaming, stopStreaming } from "./store/chatStore";
 import type { Message, UserMessage } from "@ag-ui/core";
 import { ChatInput } from "./components/ChatInput";
 import { MessageBubble } from "./components/MessageBubble";
+import { ReasoningBlock } from "./components/ReasoningBlock";
 
 type ChatView = "affix" | "dialog" | "expanded" | "aside";
 
@@ -218,15 +219,18 @@ export function ChatPanel({
                       {turn.replies.length === 0 ? (
                         <Skeleton height={48} />
                       ) : (
-                        turn.replies.map((reply) => (
-                          <MessageBubble
-                            key={reply.id}
-                            message={reply}
-                            onSaveEdit={(text) => updateMessage(reply.id, { content: text } as Partial<Message>)}
-                            onDeleteTurn={() => setTurnDeleted([i], true)}
-                            onRegenerate={reply.role === "assistant" ? () => regenerateAgentMessage(i) : undefined}
-                          />
-                        ))
+                        <>
+                          <ReasoningBlock text={turnReasoning(turn)} />
+                          {turnAnswers(turn).map((reply) => (
+                            <MessageBubble
+                              key={reply.id}
+                              message={reply}
+                              onSaveEdit={(text) => updateMessage(reply.id, { content: text } as Partial<Message>)}
+                              onDeleteTurn={() => setTurnDeleted([i], true)}
+                              onRegenerate={reply.role === "assistant" ? () => regenerateAgentMessage(i) : undefined}
+                            />
+                          ))}
+                        </>
                       )}
                     </Stack>
                   </>

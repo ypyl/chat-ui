@@ -1,3 +1,4 @@
+import { contentToText } from "@ag-ui/core";
 import { create } from "zustand";
 import type { Message, UserMessage } from "@ag-ui/core";
 
@@ -26,6 +27,16 @@ const flags = (message: Message) => (message.metadata ?? {}) as { deleted?: bool
 
 export const isDeleted = (message: Message) => flags(message).deleted === true;
 export const isError = (message: Message) => flags(message).isError === true;
+
+/**
+ * All reasoning in a turn, in arrival order. A run can emit reasoning on both sides of the answer,
+ * so the turn is the right unit to render it as one block.
+ */
+export const turnReasoning = (turn: Turn): string =>
+  turn.replies.flatMap((message) => (message.role === "reasoning" ? [contentToText(message.content)] : [])).join("\n\n");
+
+/** Everything the agent said, with the reasoning split out for separate rendering. */
+export const turnAnswers = (turn: Turn): Message[] => turn.replies.filter((message) => message.role !== "reasoning");
 
 interface ChatStore {
   messages: Message[];
