@@ -9,6 +9,9 @@ export default defineConfig({
       '/chat': {
         target: 'http://localhost:5059',
         changeOrigin: true,
+        headers: {
+          Connection: "Keep-Alive"
+        }
       },
     },
   },

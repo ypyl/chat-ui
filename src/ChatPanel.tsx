@@ -137,6 +137,7 @@ export function ChatPanel({
       // The promise resolves when the stream ends or is aborted.
       fetchEventSource("/chat/stream", {
         method: "POST",
+        openWhenHidden: true,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(messagesToSend),
         signal: controller.signal,
