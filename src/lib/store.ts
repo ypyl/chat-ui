@@ -1,6 +1,10 @@
 import { contentToText } from "@ag-ui/core";
-import { create } from "zustand";
+import { useCallback } from "react";
+import { useStore } from "zustand";
+import { createStore } from "zustand/vanilla";
+import type { StoreApi } from "zustand/vanilla";
 import type { Message, UserMessage } from "@ag-ui/core";
+import { useChatContext } from "./context";
 
 export type { Message };
 
@@ -38,7 +42,7 @@ export const turnReasoning = (turn: Turn): string =>
 /** Everything the agent said, with the reasoning split out for separate rendering. */
 export const turnAnswers = (turn: Turn): Message[] => turn.replies.filter((message) => message.role !== "reasoning");
 
-interface ChatStore {
+export interface ChatState {
   messages: Message[];
   setMessages: (messages: Message[] | ((prev: Message[]) => Message[])) => void;
   input: string;
@@ -46,47 +50,52 @@ interface ChatStore {
   selectionStart: number | null;
   selectionEnd: number | null;
   setSelectionRange: (start: number | null, end: number | null) => void;
-  selectionEnabled: boolean;
-  setSelectionEnabled: (enabled: boolean) => void;
   isStreaming: boolean;
   setIsStreaming: (streaming: boolean) => void;
   streamAbortController: AbortController | null;
   setStreamAbortController: (ctrl: AbortController | null) => void;
 }
 
-export const useChatStore = create<ChatStore>((set, get) => ({
-  messages: [],
-  setMessages: (messagesOrUpdater) =>
-    set((state) => ({
-      messages: typeof messagesOrUpdater === "function" ? messagesOrUpdater(state.messages) : messagesOrUpdater,
-    })),
-  input: "",
-  setInput: (input) => set({ input }),
-  selectionStart: null,
-  selectionEnd: null,
-  setSelectionRange: (selectionStart, selectionEnd) => set({ selectionStart, selectionEnd }),
-  selectionEnabled: true,
-  setSelectionEnabled: (enabled) => set({ selectionEnabled: enabled }),
-  isStreaming: false,
-  setIsStreaming: (streaming) => set({ isStreaming: streaming }),
-  streamAbortController: null,
-  setStreamAbortController: (ctrl) => {
-    // Abort the previous controller before replacing it
-    const prev = get().streamAbortController;
-    if (prev && prev !== ctrl) {
-      prev.abort();
-    }
-    set({ streamAbortController: ctrl });
-  },
-}));
+export type ChatStoreApi = StoreApi<ChatState>;
 
-export const useMessages = () => {
+/** A conversation. Created per `<ChatProvider>` so a page can host more than one. */
+export function createChatStore(initialMessages: Message[] = []): ChatStoreApi {
+  return createStore<ChatState>()((set, get) => ({
+    messages: initialMessages,
+    setMessages: (messagesOrUpdater) =>
+      set((state) => ({
+        messages: typeof messagesOrUpdater === "function" ? messagesOrUpdater(state.messages) : messagesOrUpdater,
+      })),
+    input: "",
+    setInput: (input) => set({ input }),
+    selectionStart: null,
+    selectionEnd: null,
+    setSelectionRange: (selectionStart, selectionEnd) => set({ selectionStart, selectionEnd }),
+    isStreaming: false,
+    setIsStreaming: (streaming) => set({ isStreaming: streaming }),
+    streamAbortController: null,
+    setStreamAbortController: (ctrl) => {
+      // Abort the previous controller before replacing it
+      const prev = get().streamAbortController;
+      if (prev && prev !== ctrl) {
+        prev.abort();
+      }
+      set({ streamAbortController: ctrl });
+    },
+  }));
+}
+
+export function useChatStore<T>(selector: (state: ChatState) => T): T {
+  return useStore(useChatContext().store, selector);
+}
+
+export const useChatMessages = () => {
   const messages = useChatStore((state) => state.messages);
   const setMessages = useChatStore((state) => state.setMessages);
   return { messages, setMessages };
 };
 
-export const useStreaming = () => {
+export const useChatStreaming = () => {
   const isStreaming = useChatStore((state) => state.isStreaming);
   const setIsStreaming = useChatStore((state) => state.setIsStreaming);
   const streamAbortController = useChatStore((state) => state.streamAbortController);
@@ -94,26 +103,22 @@ export const useStreaming = () => {
   return { isStreaming, setIsStreaming, streamAbortController, setStreamAbortController };
 };
 
-export const stopStreaming = () => {
-  const { streamAbortController, setIsStreaming, setStreamAbortController } = useChatStore.getState();
-  streamAbortController?.abort();
-  setStreamAbortController(null);
-  setIsStreaming(false);
+/** Aborts the in-flight turn, if any. */
+export const useStopStreaming = () => {
+  const store = useChatContext().store;
+  return useCallback(() => {
+    const { streamAbortController, setIsStreaming, setStreamAbortController } = store.getState();
+    streamAbortController?.abort();
+    setStreamAbortController(null);
+    setIsStreaming(false);
+  }, [store]);
 };
 
-export const useInput = () => {
+export const useChatInput = () => {
   const input = useChatStore((state) => state.input);
   const setInput = useChatStore((state) => state.setInput);
   const selectionStart = useChatStore((state) => state.selectionStart);
   const selectionEnd = useChatStore((state) => state.selectionEnd);
   const setSelectionRange = useChatStore((state) => state.setSelectionRange);
   return { input, setInput, selectionStart, selectionEnd, setSelectionRange };
-};
-
-export const useChat = () => useChatStore();
-
-export const useSelectionEnabled = () => {
-  const selectionEnabled = useChatStore((state) => state.selectionEnabled);
-  const setSelectionEnabled = useChatStore((state) => state.setSelectionEnabled);
-  return { selectionEnabled, setSelectionEnabled };
 };

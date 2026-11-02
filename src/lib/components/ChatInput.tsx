@@ -1,7 +1,7 @@
 import { ActionIcon, Box, CloseButton, Group, Paper, Stack, Text, Textarea } from "@mantine/core";
 import { IconPlayerStop, IconQuote, IconSend } from "@tabler/icons-react";
 import { useEffect, useRef } from "react";
-import { useInput } from "../store/chatStore";
+import { useChatInput } from "../store";
 
 const MAX_INPUT_SIZE = 16_384;
 
@@ -14,7 +14,7 @@ interface ChatInputProps {
 }
 
 export function ChatInput({ referencedText, onResetReferencedText, onSend, isStreaming, onStop }: ChatInputProps) {
-  const { input, setInput, selectionStart, selectionEnd, setSelectionRange } = useInput();
+  const { input, setInput, selectionStart, selectionEnd, setSelectionRange } = useChatInput();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {

@@ -1,8 +1,16 @@
 import { ActionIcon, Button, CloseButton, Group, ScrollArea, Skeleton, Stack, Text } from "@mantine/core";
 import { IconMaximize, IconMinimize, IconLayoutSidebarRight } from "@tabler/icons-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { runAgentTurn } from "./agui";
-import { groupTurns, isDeleted, turnAnswers, turnReasoning, useMessages, useStreaming, stopStreaming } from "./store/chatStore";
+import { useChatContext } from "./context";
+import {
+  groupTurns,
+  isDeleted,
+  turnAnswers,
+  turnReasoning,
+  useChatMessages,
+  useChatStreaming,
+  useStopStreaming,
+} from "./store";
 import type { Message, UserMessage } from "@ag-ui/core";
 import { ChatInput } from "./components/ChatInput";
 import { MessageBubble } from "./components/MessageBubble";
@@ -11,6 +19,7 @@ import { ReasoningBlock } from "./components/ReasoningBlock";
 type ChatView = "affix" | "dialog" | "expanded" | "aside";
 
 interface ChatPanelProps {
+  title?: string;
   viewMode?: ChatView;
   onExpand?: () => void;
   onMinimize?: () => void;
@@ -22,6 +31,7 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({
+  title = "Chat with AI",
   viewMode,
   onExpand,
   onMinimize,
@@ -31,8 +41,10 @@ export function ChatPanel({
   referencedText,
   onResetReferencedText,
 }: ChatPanelProps) {
-  const { messages, setMessages } = useMessages();
-  const { isStreaming, setIsStreaming, setStreamAbortController } = useStreaming();
+  const { messages, setMessages } = useChatMessages();
+  const { isStreaming, setIsStreaming, setStreamAbortController } = useChatStreaming();
+  const stopStreaming = useStopStreaming();
+  const { transport } = useChatContext();
   const turns = useMemo(() => groupTurns(messages), [messages]);
   const viewport = useRef<HTMLDivElement>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -92,7 +104,8 @@ export function ChatPanel({
         });
       }, 0);
 
-      runAgentTurn({ history, abortController: controller, onMessages: setMessages })
+      transport
+        .run({ history, abortController: controller, onMessages: setMessages })
         .catch((err) => {
           if (controller.signal.aborted) return;
           console.error("[chat] run failed", err);
@@ -113,7 +126,7 @@ export function ChatPanel({
         })
         .finally(finishStream);
     },
-    [setIsStreaming, setStreamAbortController, setMessages, finishStream],
+    [setIsStreaming, setStreamAbortController, setMessages, finishStream, transport],
   );
 
   const regenerateAgentMessage = useCallback(
@@ -155,7 +168,7 @@ export function ChatPanel({
     <Stack gap="xs" style={{ height: "100%" }}>
       <Group>
         <Text fw={500} mr="auto">
-          Chat with AI
+          {title}
         </Text>
         {viewMode === "expanded" ? (
           <ActionIcon variant="subtle" color="gray" onClick={onMinimize}>
@@ -170,11 +183,11 @@ export function ChatPanel({
               <IconMinimize size={20} />
             </ActionIcon>
           </>
-        ) : (
+        ) : onExpand ? (
           <ActionIcon variant="subtle" color="gray" onClick={onExpand}>
             <IconMaximize size={20} />
           </ActionIcon>
-        )}
+        ) : null}
         {viewMode !== "aside" && onMoveToAside && (
           <ActionIcon variant="subtle" color="gray" onClick={onMoveToAside}>
             <IconLayoutSidebarRight size={20} />
@@ -208,14 +221,14 @@ export function ChatPanel({
                   </Button>
                 ) : (
                   <>
-                    <Stack gap={2} align="flex-end" className="chat-message">
+                    <Stack gap={2} align="flex-end">
                       <MessageBubble
                         message={turn.user}
                         onSaveEdit={(text) => updateMessage(turn.user.id, { content: text } as Partial<Message>)}
                         onDeleteTurn={() => setTurnDeleted([i], true)}
                       />
                     </Stack>
-                    <Stack gap={2} align="flex-start" className="chat-message">
+                    <Stack gap={2} align="flex-start">
                       {turn.replies.length === 0 ? (
                         <Skeleton height={48} />
                       ) : (

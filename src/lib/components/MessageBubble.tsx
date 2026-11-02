@@ -18,7 +18,7 @@ import { IconCheck, IconCopy, IconEdit, IconRefresh, IconTrash, IconX } from "@t
 import { memo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { isError } from "../store/chatStore";
+import { isError } from "../store";
 
 interface MessageBubbleProps {
   message: Message;

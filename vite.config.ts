@@ -1,9 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
+// Demo app: `npm run dev` / `npm run build:demo`. The library has its own config, vite.lib.config.ts.
 export default defineConfig({
   plugins: [react()],
+  build: {
+    outDir: 'demo-dist',
+  },
   server: {
     proxy: {
       '/agent': {

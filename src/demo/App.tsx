@@ -3,10 +3,9 @@ import "@mantine/core/styles.css";
 import { useDisclosure } from "@mantine/hooks";
 import { useRef, useState } from "react";
 import { Link } from "wouter";
-import { ChatPanel } from "./ChatPanel";
+import { ChatPanel, useSelectionEndpoint } from "../lib";
 import { IconMessageCircle, IconQuote } from "@tabler/icons-react";
-import { useSelectionEndpoint } from "./useSelectionEndpoint";
-import { useSelectionEnabled } from "./store/chatStore";
+
 
 const fullText =
   "Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?\nLorem ipsum dolor sit amet consectetur adipisicing elit. Unde provident eos fugiat id necessitatibus magni ducimus molestias. Placeat, consequatur. Quisquam, quae magnam perspiciatis excepturi iste sint itaque sunt laborum. Nihil?";
@@ -18,7 +17,7 @@ function App() {
   const [chatView, setChatView] = useState<ChatView>("affix");
   const [textToExplain, setTextToExplain] = useState<string | null>(null);
   const textElementRef = useRef<HTMLDivElement>(null);
-  const { selectionEnabled, setSelectionEnabled } = useSelectionEnabled();
+  const [selectionEnabled, setSelectionEnabled] = useState(true);
   const endpoint = useSelectionEndpoint({ ignoreSelector: "button", containerRef: textElementRef, enabled: selectionEnabled });
 
   const handleOpenChat = () => setChatView("dialog");
