@@ -1,11 +1,12 @@
 # mantine-chat-ui
 
-Chat UI components for [Mantine](https://mantine.dev). A streaming AG-UI chat panel with markdown
-answers, collapsed reasoning, message editing, delete/restore and regenerate, plus a text-selection
-"explain this" hook.
+Chat components for [Mantine](https://mantine.dev): a streaming chat panel with markdown answers,
+collapsed reasoning, message editing, delete/restore and regenerate.
 
-The package is UI only: it owns the transcript and the streaming flags, and asks you for one thing,
-a transport that runs a turn.
+![Chat dialog](dialog.png)
+
+The package is UI only. It owns the transcript and the streaming flags, and asks you for one thing: a
+transport that runs a turn. AG-UI servers work out of the box.
 
 ## Install
 
@@ -14,12 +15,10 @@ npm install mantine-chat-ui @mantine/core @mantine/hooks
 ```
 
 React 19 and Mantine 9 are peer dependencies. There is no stylesheet to import: the components are
-built from Mantine primitives, so whatever `MantineProvider` and `@mantine/core/styles.css` your app
-already has applies.
+built from Mantine primitives, so your app's `MantineProvider` and `@mantine/core/styles.css` already
+style them.
 
-## Use
-
-Whole widget, launcher and dialog included:
+## Quick start
 
 ```tsx
 import { MantineProvider } from "@mantine/core";
@@ -38,26 +37,43 @@ export default function App() {
 }
 ```
 
-Docked panel instead, for a sidebar or a split view:
+That gives you a launcher button and a floating dialog. Nothing else in your layout is touched.
+
+## Layouts
+
+`ChatPanel` is the bare panel. It fills its container, and the header shows only the buttons whose
+callbacks you pass, so a panel in a fixed sidebar needs none.
 
 ```tsx
-import { ChatPanel } from "mantine-chat-ui";
-
 <ChatPanel
   title="Ask about this report"
-  viewMode="aside"
+  viewMode="aside"          // "dialog" | "expanded" | "aside" | "affix"
   onExpand={() => setView("expanded")}
   onMinimize={() => setView("dialog")}
   onClose={close}
-  referencedText={selectedText}
-  onResetReferencedText={() => setSelectedText(null)}
-/>;
+/>
 ```
 
-`viewMode` is `"dialog" | "expanded" | "aside" | "affix"`; the header only shows the buttons whose
-callbacks you pass, so a panel in a fixed sidebar needs no callbacks at all.
+The same conversation in three other places. The demo app switches between them and the history
+survives every move.
 
-### Talking to something that is not AG-UI
+Expanded into the main area, with markdown tables rendered through Mantine:
+
+![Expanded](expanded.png)
+
+Docked in a sidebar while the page content reflows:
+
+![Aside](aside.png)
+
+Text selected on the page, offered to the chat as context:
+
+![Selection](selection.png)
+
+The panel is a normal React component, so where it lives is your decision: a `Dialog`, an
+`AppShell.Aside`, a column in a split view, or the whole page. The demo app in `src/demo` shows all
+four placements sharing one conversation.
+
+## Talking to something that is not AG-UI
 
 `endpoint` covers AG-UI servers. For anything else, pass a transport:
 
@@ -69,7 +85,7 @@ const transport = {
       body: JSON.stringify({ messages: history }),
       signal: abortController.signal,
     });
-    // Stream whatever you like, calling onMessages with the full transcript each time.
+    // Stream however you like, calling onMessages with the full transcript each time.
     onMessages([...history, { id: crypto.randomUUID(), role: "assistant", content: await res.text() }]);
   },
 };
@@ -77,8 +93,9 @@ const transport = {
 <ChatProvider transport={transport}>...</ChatProvider>;
 ```
 
-Build a stable transport (module constant or `useMemo`): the provider reads it once on mount.
-`createAgUiTransport({ url, threadId })` is the default implementation, exported if you want to wrap it.
+Give it a stable identity (a module constant or `useMemo`): the provider reads it once on mount.
+`createAgUiTransport({ url, threadId })` is the default implementation, exported if you want to wrap
+it.
 
 ## Selection to question
 
@@ -95,9 +112,13 @@ selection. It is sample code, not part of the package.
 
 ## One conversation per provider
 
-`<ChatProvider>` creates the store, so two providers on a page are two independent conversations, and
-unmounting one drops its transcript. Pass `initialMessages` to seed history and `threadId` to keep a
-server-side thread stable. For custom state access:
+`ChatProvider` creates the store, so two providers on a page are two independent conversations and
+unmounting one drops its transcript. Because the transcript lives above the panel, moving the panel
+between layouts, or unmounting it entirely mid-answer, does not lose anything: the stream keeps
+filling the store and the panel renders it when it comes back.
+
+Pass `initialMessages` to seed history and `threadId` to keep a server-side thread stable. For custom
+state access:
 
 ```tsx
 const { messages, setMessages } = useChatMessages();
@@ -110,13 +131,13 @@ const stop = useStopStreaming();
 ```bash
 npm install
 npm run dev          # demo app on the source, proxied to localhost:5059
-npm run build:lib    # dist/index.js + d.ts
-npm run build:demo   # demo-dist, the GitHub Pages build
+npm run build:lib    # dist/index.js and dist/index.d.ts
+npm run build:demo   # demo-dist
 npm run lint
 ```
 
-`src/lib` is the package. `src/demo` is the sample app, not published.
+`src/lib` is the package. `src/demo` is the sample app and is not published.
 
-![Demo](image.png)
-![Expanded](image-1.png)
-![Aside](image-2.png)
+## License
+
+MIT
