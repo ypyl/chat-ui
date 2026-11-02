@@ -1,49 +1,44 @@
 import { HttpAgent } from "@ag-ui/client";
-import type { Message as AguiMessage } from "@ag-ui/core";
-import type { Message } from "./store/chatStore";
+import type { Message } from "@ag-ui/core";
 
 export const AGUI_URL = "/agent";
 
-/** One AG-UI thread for the browser session; runs inside it are separate. */
+/** One AG-UI thread for the browser session; each turn runs inside it. */
 export const THREAD_ID = crypto.randomUUID();
 
-/** The app's own turn model mapped onto protocol messages. */
-export function toAguiMessages(messages: Message[]): AguiMessage[] {
-  return messages.map((m, i) => ({
-    id: `${THREAD_ID}-${i}-${m.role}`,
-    role: m.role === "agent" ? "assistant" : "user",
-    content: m.text,
-  }));
-}
+/**
+ * Roles the model gets to see. A reasoning message is protocol output that the client stores and
+ * renders, not conversation input: the server maps roles onto Microsoft.Extensions.AI chat roles and
+ * rejects anything that is not a chat role.
+ */
+const isHistory = (message: Message) => message.role === "user" || message.role === "assistant";
 
 interface RunHandlers {
-  messages: Message[];
+  /** The whole transcript, in order. */
+  history: Message[];
   abortController: AbortController;
-  /** Accumulated answer text so far. */
-  onText: (text: string) => void;
-  /** Accumulated reasoning text so far. */
-  onReasoning: (text: string) => void;
+  /** Called with the agent's transcript after every change, including each text delta. */
+  onMessages: (messages: Message[]) => void;
 }
 
 /**
- * Runs one turn against the AG-UI endpoint and reports accumulated text as it streams.
+ * Runs one turn against the AG-UI endpoint.
  *
- * Rejects only on real failures: the SDK swallows the abort error, so an aborted run just
- * resolves. Deltas are appended rather than read from the per-message buffers, because one run
- * can carry several text or reasoning messages and their buffers are scoped per message id.
+ * The agent owns the run and the message list; the store mirrors it through `onMessages`. Rejects
+ * only on real failures, since the SDK treats an abort as a clean ending.
  */
-export function runAgentTurn({ messages, abortController, onText, onReasoning }: RunHandlers) {
+export function runAgentTurn({ history, abortController, onMessages }: RunHandlers) {
   const agent = new HttpAgent({ url: AGUI_URL, threadId: THREAD_ID });
-  agent.setMessages(toAguiMessages(messages));
+  agent.setMessages(history);
 
-  let text = "";
-  let reasoning = "";
+  // Middleware is the SDK's own hook for shaping the outgoing run, so the transcript keeps its
+  // reasoning messages while the request leaves without them.
+  agent.use((input, next) => next.run({ ...input, messages: input.messages.filter(isHistory) }));
 
   return agent.runAgent(
     { abortController },
     {
-      onTextMessageContentEvent: ({ event }) => onText((text += event.delta)),
-      onReasoningMessageContentEvent: ({ event }) => onReasoning((reasoning += event.delta)),
+      onMessagesChanged: ({ messages }) => onMessages(messages as Message[]),
       onRunErrorEvent: ({ event }) => {
         console.error("[agui] run failed", event.code, event.message);
       },

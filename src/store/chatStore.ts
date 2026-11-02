@@ -1,25 +1,35 @@
 import { create } from "zustand";
+import type { Message, UserMessage } from "@ag-ui/core";
 
-export type Message = {
-  role: "user" | "agent";
-  text: string;
-  reasoning?: string;
-  deleted?: boolean;
-  isError?: boolean;
-};
+export type { Message };
 
-export type Turn = {
-  user: Message;
-  agent: Message | null;
-};
+/**
+ * A question and everything the agent said in reply, including its reasoning. This is a rendering
+ * grouping only: the store keeps a single AG-UI message list, which is also what gets sent back on
+ * the next run.
+ */
+export type Turn = { user: UserMessage; replies: Message[] };
 
-export function turnsToMessages(turns: Turn[]): Message[] {
-  return turns.flatMap(turn => [turn.user, turn.agent].filter(Boolean) as Message[]);
+export function groupTurns(messages: Message[]): Turn[] {
+  const turns: Turn[] = [];
+  for (const message of messages) {
+    if (message.role === "user") {
+      turns.push({ user: message, replies: [] });
+    } else {
+      turns.at(-1)?.replies.push(message);
+    }
+  }
+  return turns;
 }
 
+const flags = (message: Message) => (message.metadata ?? {}) as { deleted?: boolean; isError?: boolean };
+
+export const isDeleted = (message: Message) => flags(message).deleted === true;
+export const isError = (message: Message) => flags(message).isError === true;
+
 interface ChatStore {
-  turns: Turn[];
-  setTurns: (turns: Turn[] | ((prev: Turn[]) => Turn[])) => void;
+  messages: Message[];
+  setMessages: (messages: Message[] | ((prev: Message[]) => Message[])) => void;
   input: string;
   setInput: (input: string) => void;
   selectionStart: number | null;
@@ -34,10 +44,10 @@ interface ChatStore {
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
-  turns: [],
-  setTurns: (turnsOrUpdater) =>
+  messages: [],
+  setMessages: (messagesOrUpdater) =>
     set((state) => ({
-      turns: typeof turnsOrUpdater === "function" ? turnsOrUpdater(state.turns) : turnsOrUpdater,
+      messages: typeof messagesOrUpdater === "function" ? messagesOrUpdater(state.messages) : messagesOrUpdater,
     })),
   input: "",
   setInput: (input) => set({ input }),
@@ -60,9 +70,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 }));
 
 export const useMessages = () => {
-  const turns = useChatStore((state) => state.turns);
-  const setTurns = useChatStore((state) => state.setTurns);
-  return { turns, setTurns };
+  const messages = useChatStore((state) => state.messages);
+  const setMessages = useChatStore((state) => state.setMessages);
+  return { messages, setMessages };
 };
 
 export const useStreaming = () => {

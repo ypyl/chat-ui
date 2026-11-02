@@ -1,8 +1,9 @@
 import { ActionIcon, Button, CloseButton, Group, ScrollArea, Skeleton, Stack, Text } from "@mantine/core";
 import { IconMaximize, IconMinimize, IconLayoutSidebarRight } from "@tabler/icons-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { runAgentTurn } from "./agui";
-import { useMessages, useStreaming, stopStreaming, turnsToMessages, type Message, type Turn } from "./store/chatStore";
+import { groupTurns, isDeleted, useMessages, useStreaming, stopStreaming } from "./store/chatStore";
+import type { Message, UserMessage } from "@ag-ui/core";
 import { ChatInput } from "./components/ChatInput";
 import { MessageBubble } from "./components/MessageBubble";
 
@@ -29,8 +30,9 @@ export function ChatPanel({
   referencedText,
   onResetReferencedText,
 }: ChatPanelProps) {
-  const { turns, setTurns } = useMessages();
+  const { messages, setMessages } = useMessages();
   const { isStreaming, setIsStreaming, setStreamAbortController } = useStreaming();
+  const turns = useMemo(() => groupTurns(messages), [messages]);
   const viewport = useRef<HTMLDivElement>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
   const turnRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -50,54 +52,23 @@ export function ChatPanel({
     }, 0);
   }, [turns.length]);
 
-  const saveEdit = useCallback(
-    (turnIndex: number, role: "user" | "agent", text: string) => {
-      setTurns((prev) => {
-        const updated = [...prev];
-        if (role === "user") {
-          updated[turnIndex] = { ...updated[turnIndex], user: { ...updated[turnIndex].user, text } };
-        } else {
-          updated[turnIndex] = {
-            ...updated[turnIndex],
-            agent: updated[turnIndex].agent ? { ...updated[turnIndex].agent!, text } : null,
-          };
-        }
-        return updated;
-      });
+  const updateMessage = useCallback(
+    (id: string, patch: Partial<Message>) => {
+      setMessages((prev) => prev.map((message) => (message.id === id ? ({ ...message, ...patch } as Message) : message)));
     },
-    [setTurns],
+    [setMessages],
   );
 
-  const deleteTurn = useCallback(
-    (turnIndexes: number[]) => {
-      setTurns((prev) => {
-        const updated = [...prev];
-        turnIndexes.forEach((idx) => {
-          updated[idx] = {
-            ...updated[idx],
-            user: { ...updated[idx].user, deleted: true },
-            agent: updated[idx].agent ? { ...updated[idx].agent, deleted: true } : null,
-          };
-        });
-        return updated;
-      });
+  const setTurnDeleted = useCallback(
+    (turnIndexes: number[], deleted: boolean) => {
+      const ids = new Set(turnIndexes.flatMap((i) => [turns[i].user, ...turns[i].replies].map((m) => m.id)));
+      setMessages((prev) =>
+        prev.map((message) =>
+          ids.has(message.id) ? ({ ...message, metadata: { ...message.metadata, deleted } } as Message) : message,
+        ),
+      );
     },
-    [setTurns],
-  );
-
-  const undoTurn = useCallback(
-    (turnIndex: number) => {
-      setTurns((prev) => {
-        const updated = [...prev];
-        updated[turnIndex] = {
-          ...updated[turnIndex],
-          user: { ...updated[turnIndex].user, deleted: false },
-          agent: updated[turnIndex].agent ? { ...updated[turnIndex].agent, deleted: false } : null,
-        };
-        return updated;
-      });
-    },
-    [setTurns],
+    [turns, setMessages],
   );
 
   const finishStream = useCallback(() => {
@@ -105,73 +76,56 @@ export function ChatPanel({
     setStreamAbortController(null);
   }, [setIsStreaming, setStreamAbortController]);
 
-  const startStream = useCallback(
-    (turnIndex: number, messagesToSend: Message[]) => {
+  // The agent owns the run and the message list; the store mirrors it event by event.
+  const runTurn = useCallback(
+    (history: Message[]) => {
       // Abort any previous stream (setStreamAbortController handles this automatically)
       const controller = new AbortController();
       setStreamAbortController(controller);
       setIsStreaming(true);
 
       setTimeout(() => {
-        turnRefs.current.get(turnIndex)?.scrollIntoView({ block: "start", behavior: "smooth" });
+        turnRefs.current.get(history.filter((m) => m.role === "user").length - 1)?.scrollIntoView({
+          block: "start",
+          behavior: "smooth",
+        });
       }, 0);
 
-      const patchAgent = (patch: Partial<Message>) => {
-        setTurns((prev) => {
-          const updated = [...prev];
-          const current = updated[turnIndex]?.agent ?? { role: "agent" as const, text: "" };
-          updated[turnIndex] = { ...updated[turnIndex], agent: { ...current, ...patch } };
-          return updated;
-        });
-      };
-
-      const handleError = () => {
-        setTurns((prev) => {
-          const updated = [...prev];
-          // Only set error if the agent message is still empty (wasn't aborted mid-stream with partial content)
-          if (!updated[turnIndex]?.agent?.text) {
-            updated[turnIndex] = {
-              ...updated[turnIndex],
-              agent: { role: "agent", text: "Failed to get response. Please try again.", isError: true },
-            };
-          }
-          return updated;
-        });
-      };
-
-      // Each event carries the accumulated buffer, so the turn is replaced rather than appended to.
-      // The promise resolves on RUN_FINISHED and on abort; only real failures reject.
-      runAgentTurn({
-        messages: messagesToSend,
-        abortController: controller,
-        onText: (text) => patchAgent({ text }),
-        onReasoning: (reasoning) => patchAgent({ reasoning }),
-      })
+      runAgentTurn({ history, abortController: controller, onMessages: setMessages })
         .catch((err) => {
-          if (!controller.signal.aborted) {
-            console.error("[chat] stream failed", err);
-            handleError();
-          }
+          if (controller.signal.aborted) return;
+          console.error("[chat] run failed", err);
+          // Keep partial output: only add an error bubble when the turn produced no answer.
+          setMessages((prev) => {
+            const last = prev.at(-1);
+            if (last?.role === "assistant" && last.content) return prev;
+            return [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content: "Failed to get response. Please try again.",
+                metadata: { isError: true },
+              },
+            ];
+          });
         })
         .finally(finishStream);
     },
-    [setIsStreaming, setStreamAbortController, setTurns, finishStream],
+    [setIsStreaming, setStreamAbortController, setMessages, finishStream],
   );
 
   const regenerateAgentMessage = useCallback(
     (turnIndex: number) => {
       if (isStreaming) return;
-      const messagesToSend = turnsToMessages(turns.slice(0, turnIndex)).concat(turns[turnIndex].user);
-
-      setTurns((prev) => {
-        const updated = [...prev];
-        updated[turnIndex] = { ...updated[turnIndex], agent: null };
-        return updated;
-      });
-
-      startStream(turnIndex, messagesToSend);
+      // Drop this turn's answer and everything after it, then run again from the question.
+      const cutoff = messages.findIndex((message) => message.id === turns[turnIndex].user.id);
+      if (cutoff < 0) return;
+      const history = messages.slice(0, cutoff + 1);
+      setMessages(history);
+      runTurn(history);
     },
-    [turns, isStreaming, setTurns, startStream],
+    [turns, messages, isStreaming, setMessages, runTurn],
   );
 
   const sendMessage = useCallback(
@@ -186,17 +140,14 @@ export function ChatPanel({
       }
 
       const userText = refText ? `Context: ${refText}\n\nQuestion: ${input}` : input;
+      const userMessage: UserMessage = { id: crypto.randomUUID(), role: "user", content: userText };
 
-      const newTurn: Turn = { user: { role: "user", text: userText }, agent: null };
-      const newTurnIndex = turns.length;
-
-      setTurns((prev) => [...prev, newTurn]);
+      const history = [...messages, userMessage];
+      setMessages(history);
       setInput("");
-
-      const allMessages = turnsToMessages([...turns, newTurn]);
-      startStream(newTurnIndex, allMessages);
+      runTurn(history);
     },
-    [turns, isStreaming, setTurns, startStream, onResetReferencedText],
+    [messages, isStreaming, setMessages, runTurn, onResetReferencedText],
   );
 
   return (
@@ -250,8 +201,8 @@ export function ChatPanel({
                   paddingTop: "var(--mantine-spacing-xs)",
                 }}
               >
-                {turn.user.deleted ? (
-                  <Button variant="transparent" size="xs" p={4} onClick={() => undoTurn(i)}>
+                {isDeleted(turn.user) ? (
+                  <Button variant="transparent" size="xs" p={4} onClick={() => setTurnDeleted([i], false)}>
                     Restore deleted messages
                   </Button>
                 ) : (
@@ -259,20 +210,23 @@ export function ChatPanel({
                     <Stack gap={2} align="flex-end" className="chat-message">
                       <MessageBubble
                         message={turn.user}
-                        onSaveEdit={(text) => saveEdit(i, "user", text)}
-                        onDeleteTurn={() => deleteTurn([i])}
+                        onSaveEdit={(text) => updateMessage(turn.user.id, { content: text } as Partial<Message>)}
+                        onDeleteTurn={() => setTurnDeleted([i], true)}
                       />
                     </Stack>
                     <Stack gap={2} align="flex-start" className="chat-message">
-                      {turn.agent === null ? (
+                      {turn.replies.length === 0 ? (
                         <Skeleton height={48} />
                       ) : (
-                        <MessageBubble
-                          message={turn.agent}
-                          onSaveEdit={(text) => saveEdit(i, "agent", text)}
-                          onDeleteTurn={() => deleteTurn([i])}
-                          onRegenerate={() => regenerateAgentMessage(i)}
-                        />
+                        turn.replies.map((reply) => (
+                          <MessageBubble
+                            key={reply.id}
+                            message={reply}
+                            onSaveEdit={(text) => updateMessage(reply.id, { content: text } as Partial<Message>)}
+                            onDeleteTurn={() => setTurnDeleted([i], true)}
+                            onRegenerate={reply.role === "assistant" ? () => regenerateAgentMessage(i) : undefined}
+                          />
+                        ))
                       )}
                     </Stack>
                   </>

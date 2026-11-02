@@ -13,11 +13,12 @@ import {
   Title,
   Tooltip,
 } from "@mantine/core";
+import { contentToText, type Message } from "@ag-ui/core";
 import { IconCheck, IconCopy, IconEdit, IconRefresh, IconTrash, IconX } from "@tabler/icons-react";
 import { memo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { Message } from "../store/chatStore";
+import { isError } from "../store/chatStore";
 
 interface MessageBubbleProps {
   message: Message;
@@ -91,6 +92,8 @@ export const MessageBubble = memo(function MessageBubble({
 }: MessageBubbleProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState("");
+  // Activity messages carry arbitrary structured data rather than text, and this UI does not render them.
+  const text = message.role === "activity" ? "" : contentToText(message.content);
 
   const handleStartEdit = (text: string) => {
     setIsEditing(true);
@@ -125,47 +128,51 @@ export const MessageBubble = memo(function MessageBubble({
       );
     }
 
-    if (message.isError) {
+    if (isError(message)) {
       return (
         <Alert variant="light" color="red">
-          {message.text}
+          {text}
         </Alert>
       );
     }
 
-    if (message.role === "agent") {
+    if (message.role === "reasoning") {
       return (
-        <>
-          {message.reasoning && (
-            <Box component="details" mb={4}>
-              <Text component="summary" size="xs" c="dimmed" style={{ cursor: "pointer" }}>
-                Reasoning
-              </Text>
-              <Text size="xs" c="dimmed" fs="italic" style={{ whiteSpace: "pre-wrap" }}>
-                {message.reasoning}
-              </Text>
-            </Box>
-          )}
-          <MarkdownContent text={message.text} />
-        </>
+        <Box component="details">
+          <Text component="summary" size="xs" c="dimmed" style={{ cursor: "pointer" }}>
+            Reasoning
+          </Text>
+          <Text size="xs" c="dimmed" fs="italic" style={{ whiteSpace: "pre-wrap" }}>
+            {text}
+          </Text>
+        </Box>
       );
+    }
+
+    if (message.role === "assistant") {
+      return <MarkdownContent text={text} />;
     }
 
     return (
       <Paper p="xs" bg="var(--mantine-color-blue-light)" radius="md">
         <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
-          {message.text}
+          {text}
         </Text>
       </Paper>
     );
   };
 
+  // Reasoning is protocol output shown for context, not a turn the user manages.
+  if (message.role === "reasoning") {
+    return renderContent();
+  }
+
   return (
     <Stack gap="xs">
       {renderContent()}
       <Group gap="xs" justify={message.role === "user" ? "flex-end" : undefined}>
-        {message.role === "agent" && (
-          <CopyButton value={message.text} timeout={2000}>
+        {message.role === "assistant" && (
+          <CopyButton value={text} timeout={2000}>
             {({ copied, copy }) => (
               <Tooltip label={copied ? "Copied" : "Copy"} withArrow position="right">
                 <ActionIcon size="xs" color={copied ? "teal" : "gray"} variant="subtle" onClick={copy}>
@@ -175,13 +182,13 @@ export const MessageBubble = memo(function MessageBubble({
             )}
           </CopyButton>
         )}
-        {message.role === "agent" && onRegenerate && (
+        {message.role === "assistant" && onRegenerate && (
           <ActionIcon size="xs" variant="subtle" color="gray" onClick={onRegenerate}>
             <IconRefresh size={12} />
           </ActionIcon>
         )}
         {message.role === "user" && !isEditing && (
-          <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => handleStartEdit(message.text)}>
+          <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => handleStartEdit(text)}>
             <IconEdit size={12} />
           </ActionIcon>
         )}
