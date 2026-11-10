@@ -3,7 +3,7 @@
 Chat components for [Mantine](https://mantine.dev): a streaming chat panel with markdown answers,
 collapsed reasoning, message editing, delete/restore and regenerate.
 
-![Chat dialog](dialog.png)
+![Chat dialog](https://raw.githubusercontent.com/ypyl/chat-ui/master/dialog.png)
 
 The package is UI only. It owns the transcript and the streaming flags, and asks you for one thing: a
 transport that runs a turn. AG-UI servers work out of the box.
@@ -59,15 +59,15 @@ survives every move.
 
 Expanded into the main area, with markdown tables rendered through Mantine:
 
-![Expanded](expanded.png)
+![Expanded](https://raw.githubusercontent.com/ypyl/chat-ui/master/expanded.png)
 
 Docked in a sidebar while the page content reflows:
 
-![Aside](aside.png)
+![Aside](https://raw.githubusercontent.com/ypyl/chat-ui/master/aside.png)
 
 Text selected on the page, offered to the chat as context:
 
-![Selection](selection.png)
+![Selection](https://raw.githubusercontent.com/ypyl/chat-ui/master/selection.png)
 
 The panel is a normal React component, so where it lives is your decision: a `Dialog`, an
 `AppShell.Aside`, a column in a split view, or the whole page. The demo app in `src/demo` shows all
