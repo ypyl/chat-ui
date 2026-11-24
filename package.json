@@ -1,6 +1,6 @@
 {
   "name": "mantine-chat-ui",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Chat UI for Mantine: an AG-UI chat panel with streaming, markdown, reasoning and message editing.",
   "license": "MIT",
   "author": "Yauhen Pyl",
